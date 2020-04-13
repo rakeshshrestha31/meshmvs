@@ -48,7 +48,7 @@ class Checkpoint(object):
         self.restarts = []
         if os.path.isfile(self.with_model_path) and not overwrite:
             logger.info('Loading checkpoint from "%s"' % self.with_model_path)
-            self.from_dict(torch.load(self.with_model_path))
+            self.from_dict(torch.load(self.with_model_path, map_location='cpu'))
             self.restarts.append(self.t)
 
     def step(self):
