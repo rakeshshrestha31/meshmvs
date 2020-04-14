@@ -44,10 +44,7 @@ class MeshVoxDataset(Dataset):
         self.image_ids = []
         self.mid_to_samples = {}
 
-        transform = [T.ToTensor()]
-        if normalize_images:
-            transform.append(imagenet_preprocess())
-        self.transform = T.Compose(transform)
+        self.transform = self.get_transform(normalize_images)
 
         summary_json = os.path.join(data_dir, "summary.json")
         with open(summary_json, "r") as f:
@@ -82,60 +79,94 @@ class MeshVoxDataset(Dataset):
     def __len__(self):
         return len(self.synset_ids)
 
+    @staticmethod
+    def get_transform(normalize_images):
+        transform = [T.ToTensor()]
+        if normalize_images:
+            transform.append(imagenet_preprocess())
+        return T.Compose(transform)
+
+    @staticmethod
+    def read_camera_parameters(data_dir, sid, mid):
+        # Always read metadata for this model; TODO cache in __init__?
+        metadata_path = os.path.join(data_dir, sid, mid, "metadata.pt")
+        metadata = torch.load(metadata_path)
+        return metadata
+
+    @staticmethod
+    def read_image(data_dir, sid, mid, img_path):
+        img_path = os.path.join(data_dir, sid, mid, "images", img_path)
+        # Load the image
+        with open(img_path, "rb") as f:
+            img = Image.open(f).convert("RGB")
+        return img
+
+    @staticmethod
+    def read_mesh(data_dir, sid, mid, RT):
+        mesh_path = os.path.join(data_dir, sid, mid, "mesh.pt")
+        mesh_data = torch.load(mesh_path)
+        verts, faces = mesh_data["verts"], mesh_data["faces"]
+        verts = project_verts(verts, RT)
+        return verts, faces
+
+    def read_voxels(self, data_dir, sid, mid, iid, K, RT):
+        # Use precomputed voxels if we have them, otherwise return voxel_coords
+        # and we will compute voxels in postprocess
+        voxel_file = "vox%d/%03d.pt" % (self.voxel_size, iid)
+        voxel_file = os.path.join(self.data_dir, sid, mid, voxel_file)
+        P = None
+
+        if os.path.isfile(voxel_file):
+            voxels = torch.load(voxel_file)
+        else:
+            voxel_path = os.path.join(self.data_dir, sid, mid, "voxels.pt")
+            voxel_data = torch.load(voxel_path)
+            voxels = voxel_data["voxel_coords"]
+            P = K.mm(RT)
+        return voxels, P
+
+    def sample_points_normals(self, data_dir, sid, mid, RT):
+        samples = self.mid_to_samples.get(mid, None)
+        if samples is None:
+            # They were not cached in memory, so read off disk
+            samples_path = os.path.join(data_dir, sid, mid, "samples.pt")
+            samples = torch.load(samples_path)
+        points = samples["points_sampled"]
+        normals = samples["normals_sampled"]
+        idx = torch.randperm(points.shape[0])[: self.num_samples]
+        points, normals = points[idx], normals[idx]
+        points = project_verts(points, RT)
+        normals = normals.mm(RT[:3, :3].t())  # Only rotate, don't translate
+        return points, normals
+
     def __getitem__(self, idx):
         sid = self.synset_ids[idx]
         mid = self.model_ids[idx]
         iid = self.image_ids[idx]
 
-        # Always read metadata for this model; TODO cache in __init__?
-        metadata_path = os.path.join(self.data_dir, sid, mid, "metadata.pt")
-        metadata = torch.load(metadata_path)
+        metadata = self.read_camera_parameters(self.data_dir, sid, mid)
         K = metadata["intrinsic"]
         RT = metadata["extrinsics"][iid]
-        img_path = metadata["image_list"][iid]
-        img_path = os.path.join(self.data_dir, sid, mid, "images", img_path)
 
-        # Load the image
-        with open(img_path, "rb") as f:
-            img = Image.open(f).convert("RGB")
+        img_path = metadata["image_list"][iid]
+        img = self.read_image(self.data_dir, sid, mid, img_path)
         img = self.transform(img)
 
         # Maybe read mesh
         verts, faces = None, None
         if self.return_mesh:
-            mesh_path = os.path.join(self.data_dir, sid, mid, "mesh.pt")
-            mesh_data = torch.load(mesh_path)
-            verts, faces = mesh_data["verts"], mesh_data["faces"]
-            verts = project_verts(verts, RT)
+            verts, faces = self.read_mesh(self.data_dir, sid, mid, RT)
 
         # Maybe use cached samples
         points, normals = None, None
         if not self.sample_online:
-            samples = self.mid_to_samples.get(mid, None)
-            if samples is None:
-                # They were not cached in memory, so read off disk
-                samples_path = os.path.join(self.data_dir, sid, mid, "samples.pt")
-                samples = torch.load(samples_path)
-            points = samples["points_sampled"]
-            normals = samples["normals_sampled"]
-            idx = torch.randperm(points.shape[0])[: self.num_samples]
-            points, normals = points[idx], normals[idx]
-            points = project_verts(points, RT)
-            normals = normals.mm(RT[:3, :3].t())  # Only rotate, don't translate
+            points, normals = self.sample_points_normals(
+                self.data_dir, sid, mid, RT
+            )
 
         voxels, P = None, None
         if self.voxel_size > 0:
-            # Use precomputed voxels if we have them, otherwise return voxel_coords
-            # and we will compute voxels in postprocess
-            voxel_file = "vox%d/%03d.pt" % (self.voxel_size, iid)
-            voxel_file = os.path.join(self.data_dir, sid, mid, voxel_file)
-            if os.path.isfile(voxel_file):
-                voxels = torch.load(voxel_file)
-            else:
-                voxel_path = os.path.join(self.data_dir, sid, mid, "voxels.pt")
-                voxel_data = torch.load(voxel_path)
-                voxels = voxel_data["voxel_coords"]
-                P = K.mm(RT)
+            voxels, P = self.read_voxels(self.data_dir, sid, mid, iid, K, RT)
 
         id_str = "%s-%s-%02d" % (sid, mid, iid)
         return img, verts, faces, points, normals, voxels, P, id_str
