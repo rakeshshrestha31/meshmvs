@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, Subse
 from torch.utils.data.distributed import DistributedSampler
 
 from .mesh_vox import MeshVoxDataset
+from .mesh_vox_multi_view import MeshVoxMultiViewDataset
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,8 @@ def _identity(x):
 
 
 def build_data_loader(
-    cfg, dataset, split_name, num_workers=4, multigpu=False, shuffle=True, num_samples=None
+    cfg, dataset, split_name, num_workers=4,
+    multigpu=False, shuffle=True, num_samples=None
 ):
 
     batch_size = cfg.SOLVER.BATCH_SIZE
@@ -47,17 +49,23 @@ def build_data_loader(
     batch_size //= num_gpus
 
     logger.info('Building dataset for split "%s"' % split_name)
+
+    dataset_args = {
+        "data_dir": cfg.DATASETS.DATA_DIR,
+        "split": split,
+        "num_samples": cfg.MODEL.MESH_HEAD.GT_NUM_SAMPLES,
+        "voxel_size": cfg.MODEL.VOXEL_HEAD.VOXEL_SIZE,
+        "return_mesh": return_mesh,
+        "sample_online": sample_online,
+        "return_id_str": return_id_str,
+    }
     if dataset == "MeshVox":
-        dset = MeshVoxDataset(
-            cfg.DATASETS.DATA_DIR,
-            split=split,
-            num_samples=cfg.MODEL.MESH_HEAD.GT_NUM_SAMPLES,
-            voxel_size=cfg.MODEL.VOXEL_HEAD.VOXEL_SIZE,
-            return_mesh=return_mesh,
-            sample_online=sample_online,
-            return_id_str=return_id_str,
-        )
+        dset = MeshVoxDataset(**dataset_args)
         collate_fn = MeshVoxDataset.collate_fn
+    elif dataset == "MeshVoxMultiView":
+        dset = MeshVoxMultiViewDataset(**dataset_args)
+        collate_fn = MeshVoxMultiViewDataset.collate_fn
+
     else:
         raise ValueError("Dataset %s not registered" % dataset)
 

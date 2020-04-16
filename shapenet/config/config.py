@@ -80,6 +80,7 @@ def get_shapenet_cfg():
     # ------------------------------------------------------------------------ #
     cfg.DATASETS = CN()
     cfg.DATASETS.NAME = "shapenet"
+    cfg.DATASETS.MULTI_VIEW = False
 
     # ------------------------------------------------------------------------ #
     # Misc options

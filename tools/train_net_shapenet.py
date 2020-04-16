@@ -40,6 +40,11 @@ def copy_data(args):
     args.data_dir = os.path.join(args.tmp_dir, data_base)
     logger.info("args.data_dir = %s" % args.data_dir)
 
+def get_dataset_name(cfg):
+    if cfg.DATASETS.MULTI_VIEW:
+        return "MeshVoxMultiView"
+    else:
+        return "MeshVox"
 
 def main_worker_eval(worker_id, args):
 
@@ -47,7 +52,9 @@ def main_worker_eval(worker_id, args):
     cfg = setup(args)
 
     # build test set
-    test_loader = build_data_loader(cfg, "MeshVox", "test", multigpu=False)
+    test_loader = build_data_loader(
+        cfg, get_dataset_name(cfg), "test", multigpu=False
+    )
     logger.info("test - %d" % len(test_loader))
 
     # load checkpoing and build model
@@ -265,7 +272,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
 
     if comm.is_main_process():
         logger.info("Evaluating on test set:")
-        test_loader = build_data_loader(cfg, "MeshVox", "test", multigpu=False)
+        test_loader = build_data_loader(
+            cfg, get_dataset_name(cfg), "test", multigpu=False
+        )
         evaluate_test(model, test_loader)
 
 
@@ -315,16 +324,20 @@ def eval_and_save(model, loaders, optimizer, scheduler, cp):
 def setup_loaders(cfg):
     loaders = {}
     loaders["train"] = build_data_loader(
-        cfg, "MeshVox", "train", multigpu=comm.get_world_size() > 1
+        cfg, get_dataset_name(cfg), "train", multigpu=comm.get_world_size() > 1
     )
 
     # Since sampling the mesh is now coupled with the data loader, we need to
     # make two different Dataset / DataLoaders for the training set: one for
     # training which uses precomputd samples, and one for evaluation which uses
     # more samples and computes them on the fly. This is sort of gross.
-    loaders["train_eval"] = build_data_loader(cfg, "MeshVox", "train_eval", multigpu=False)
+    loaders["train_eval"] = build_data_loader(
+        cfg, get_dataset_name(cfg), "train_eval", multigpu=False
+    )
 
-    loaders["val"] = build_data_loader(cfg, "MeshVox", "val", multigpu=False)
+    loaders["val"] = build_data_loader(
+        cfg, get_dataset_name(cfg), "val", multigpu=False
+    )
     return loaders
 
 
