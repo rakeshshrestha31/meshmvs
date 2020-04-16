@@ -94,6 +94,7 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
             extrinsics.append(metadata["extrinsics"][iid])
 
         imgs = torch.stack(imgs, dim=0)
+        extrinsics = torch.stack(extrinsics, dim=0)
         RT = extrinsics[0]
 
         # Maybe read mesh
@@ -115,5 +116,6 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
             )
 
         id_str = "%s-%s-%02d" % (sid, mid, ref_iid)
-        return imgs, verts, faces, points, normals, voxels, P, id_str
+        return imgs, verts, faces, points, normals, \
+               voxels, P, K, extrinsics, id_str
 

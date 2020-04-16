@@ -169,7 +169,7 @@ class MeshVoxDataset(Dataset):
             voxels, P = self.read_voxels(self.data_dir, sid, mid, iid, K, RT)
 
         id_str = "%s-%s-%02d" % (sid, mid, iid)
-        return img, verts, faces, points, normals, voxels, P, id_str
+        return img, verts, faces, points, normals, voxels, P, K, [RT], id_str
 
     def _voxelize(self, voxel_coords, P):
         V = self.voxel_size
@@ -216,7 +216,8 @@ class MeshVoxDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        imgs, verts, faces, points, normals, voxels, Ps, id_strs = zip(*batch)
+        imgs, verts, faces, points, normals, voxels, \
+                Ps, Ks, extrinsics, id_strs = zip(*batch)
         imgs = torch.stack(imgs, dim=0)
         if verts[0] is not None and faces[0] is not None:
             # TODO(gkioxari) Meshes should accept tuples
@@ -237,12 +238,18 @@ class MeshVoxDataset(Dataset):
         elif voxels[0].dim() == 3:
             # They are actual voxels
             voxels = torch.stack(voxels, dim=0)
-        return imgs, meshes, points, normals, voxels, Ps, id_strs
+
+        # stack multiple views' intrinsics/extrinsics
+        Ks = torch.stack(Ks, dim=0)
+        extrinsics = torch.stack(extrinsics, dim=0)
+
+        return imgs, meshes, points, normals, voxels, Ps, Ks, extrinsics, id_strs
 
     def postprocess(self, batch, device=None):
         if device is None:
             device = torch.device("cuda")
-        imgs, meshes, points, normals, voxels, Ps, id_strs = batch
+        imgs, meshes, points, normals, voxels, Ps, Ks, extrinsics, id_strs \
+                = batch
         imgs = imgs.to(device)
         if meshes is not None:
             meshes = meshes.to(device)
@@ -268,7 +275,10 @@ class MeshVoxDataset(Dataset):
                     voxels.append(cur_voxels)
                 voxels = torch.stack(voxels, dim=0)
 
+        Ks = Ks.to(device)
+        extrinsics = extrinsics.to(device)
         if self.return_id_str:
-            return imgs, meshes, points, normals, voxels, id_strs
+            return imgs, meshes, points, normals, voxels, \
+                    Ks, extrinsics, id_strs
         else:
-            return imgs, meshes, points, normals, voxels
+            return imgs, meshes, points, normals, voxels, Ks, extrinsics
