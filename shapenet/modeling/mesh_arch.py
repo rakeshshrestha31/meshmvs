@@ -9,6 +9,9 @@ from pytorch3d.utils import ico_sphere
 from shapenet.modeling.backbone import build_backbone
 from shapenet.modeling.heads import MeshRefinementHead, VoxelHead
 from shapenet.utils.coords import get_blender_intrinsic_matrix, voxel_to_world
+from shapenet.utils.coords import transform_meshes, transform_verts
+from shapenet.utils.coords import world_coords_to_voxel, voxel_coords_to_world
+from shapenet.utils.coords import voxel_grid_coords
 
 MESH_ARCH_REGISTRY = Registry("MESH_ARCH")
 
@@ -18,21 +21,23 @@ class VoxMeshHead(nn.Module):
     def __init__(self, cfg):
         super(VoxMeshHead, self).__init__()
 
-        # fmt: off
-        backbone                = cfg.MODEL.BACKBONE
-        self.cubify_threshold   = cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH
-        self.voxel_size         = cfg.MODEL.VOXEL_HEAD.VOXEL_SIZE
-        # fmt: on
-
-        self.register_buffer("K", get_blender_intrinsic_matrix())
+        self.setup(cfg)
         # backbone
-        self.backbone, feat_dims = build_backbone(backbone)
+        self.backbone, feat_dims = build_backbone(cfg.MODEL.BACKBONE)
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
         # mesh head
         cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = sum(feat_dims)
         self.mesh_head = MeshRefinementHead(cfg)
+
+    def setup(self, cfg):
+        # fmt: off
+        self.cubify_threshold   = cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH
+        self.voxel_size         = cfg.MODEL.VOXEL_HEAD.VOXEL_SIZE
+        # fmt: on
+
+        self.register_buffer("K", get_blender_intrinsic_matrix())
 
     def _get_projection_matrix(self, N, device):
         return self.K[None].repeat(N, 1, 1).to(device).detach()
@@ -91,6 +96,105 @@ class VoxMeshHead(nn.Module):
         refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
         return voxel_scores, refined_meshes
 
+@MESH_ARCH_REGISTRY.register()
+class VoxMeshMultiViewHead(VoxMeshHead):
+    def __init__(self, cfg):
+        nn.Module.__init__(self)
+
+        self.setup(cfg)
+        # backbone
+        self.backbone, feat_dims = build_backbone(cfg.MODEL.BACKBONE)
+        # voxel head
+        cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = feat_dims[-1]
+        self.voxel_head = VoxelHead(cfg)
+        # mesh head
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = sum(feat_dims)
+        self.mesh_head = MeshRefinementHead(cfg)
+
+    def forward(self, imgs, intrinsics, extrinsics, voxel_only=False):
+        batch_size = imgs.shape[0]
+        num_views = imgs.shape[1]
+        device = imgs.device
+
+        # flatten the batch and views
+        flat_imgs = imgs.view(-1, *(imgs.shape[2:]))
+        img_feats = self.backbone(flat_imgs)
+        voxel_scores = self.voxel_head(img_feats[-1])
+        # unflatten the batch and views
+        voxel_scores = voxel_scores.view(
+            batch_size, num_views, *(voxel_scores.shape[1:])
+        )
+
+        P = self._get_projection_matrix(batch_size, device)
+        self.merge_multi_view_voxels(voxel_scores, intrinsics, extrinsics)
+        exit(0)
+
+        if voxel_only:
+            dummy_meshes = self._dummy_mesh(batch_size, device)
+            dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
+            return voxel_scores, dummy_refined
+
+        cubified_meshes = self.cubify(voxel_scores)
+        refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
+        return voxel_scores, refined_meshes
+
+    def merge_multi_view_voxels(self, voxel_scores, intrinsics, extrinsics):
+        """
+        Merge multive voxel scores
+        Inputs:
+        - voxel_scores: tensor of shape (batch, view, channel, h, w)
+        Returns:
+        - float tensor of shape (batch, channel, h, w)
+        """
+        batch_size = voxel_scores.shape[0]
+        device = voxel_scores.device
+        voxel_scores = voxel_scores.unbind(dim=1)
+        T_ref_world = extrinsics[:, 0]
+
+        from pytorch3d.io import save_obj
+        import open3d as o3d
+        import time
+        stamp = int(time.time() * 1000)
+        for view_idx, voxel_scores_view in enumerate(voxel_scores):
+            T_view_world = extrinsics[:, view_idx]
+            T_world_view = torch.inverse(T_view_world)
+            T_ref_view = T_ref_world.bmm(T_world_view)
+
+            voxel_probs = voxel_scores_view.sigmoid()
+            active_voxels = voxel_probs > self.cubify_threshold
+            cubified_meshes = self.cubify(voxel_scores_view)
+            cubified_meshes = transform_meshes(cubified_meshes, T_ref_view)
+
+            # compute grid points
+            grid_shape = list(voxel_scores_view.shape[-3:])
+            norm_coords = voxel_grid_coords(grid_shape)
+            grid_points = voxel_coords_to_world(norm_coords.view(-1, 3)) \
+                            .view(1, -1, 3).expand(batch_size, -1, -1) \
+                            .to(device)
+            # transform to ref frame
+            grid_points = transform_verts(grid_points, T_ref_view)[:, :, :3]
+            norm_transformed_coords = world_coords_to_voxel(grid_points) \
+                                        .view(batch_size, *grid_shape, 3)
+            grid_points = grid_points.view(batch_size, *grid_shape, 3)
+
+            for batch_idx, mesh in enumerate(cubified_meshes):
+                points = grid_points[batch_idx][active_voxels[batch_idx]]
+                pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                    points.view(-1, 3).cpu().detach().numpy()
+                ))
+                o3d.io.write_point_cloud(
+                    '/tmp/cube_mesh_{}_{}_{}_voxels.ply'.format(
+                        stamp, batch_idx, view_idx
+                    ),
+                    pcd
+                )
+
+                vertices = mesh.verts_packed()
+                faces = mesh.faces_packed()
+                save_obj('/tmp/cube_mesh_{}_{}_{}.obj'.format(
+                    stamp, batch_idx, view_idx
+                ), vertices, faces)
+                print('mesh:', vertices.shape, faces.shape)
 
 @MESH_ARCH_REGISTRY.register()
 class SphereInitHead(nn.Module):

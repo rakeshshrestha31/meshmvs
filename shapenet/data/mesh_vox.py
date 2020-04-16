@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as T
 from PIL import Image
 from shapenet.data.utils import imagenet_preprocess
-from shapenet.utils.coords import SHAPENET_MAX_ZMAX, SHAPENET_MIN_ZMIN, project_verts
+from shapenet.utils.coords import project_verts, world_coords_to_voxel
 
 logger = logging.getLogger(__name__)
 
@@ -174,33 +174,7 @@ class MeshVoxDataset(Dataset):
     def _voxelize(self, voxel_coords, P):
         V = self.voxel_size
         device = voxel_coords.device
-        voxel_coords = project_verts(voxel_coords, P)
-
-        # In the original coordinate system, the object fits in a unit sphere
-        # centered at the origin. Thus after transforming by RT, it will fit
-        # in a unit sphere centered at T = RT[:, 3] = (0, 0, RT[2, 3]). We need
-        # to figure out what the range of z will be after being further
-        # transformed by K. We can work this out explicitly.
-        # z0 = RT[2, 3].item()
-        # zp, zm = z0 - 0.5, z0 + 0.5
-        # k22, k23 = K[2, 2].item(), K[2, 3].item()
-        # k32, k33 = K[3, 2].item(), K[3, 3].item()
-        # zmin = (zm * k22 + k23) / (zm * k32 + k33)
-        # zmax = (zp * k22 + k23) / (zp * k32 + k33)
-
-        # Using the actual zmin and zmax of the model is bad because we need them
-        # to perform the inverse transform, which transform voxels back into world
-        # space for refinement or evaluation. Instead we use an empirical min and
-        # max over the dataset; that way it is consistent for all images.
-        zmin = SHAPENET_MIN_ZMIN
-        zmax = SHAPENET_MAX_ZMAX
-
-        # Once we know zmin and zmax, we need to adjust the z coordinates so the
-        # range [zmin, zmax] instead runs from [-1, 1]
-        m = 2.0 / (zmax - zmin)
-        b = -2.0 * zmin / (zmax - zmin) - 1
-        voxel_coords[:, 2].mul_(m).add_(b)
-        voxel_coords[:, 1].mul_(-1)  # Flip y
+        voxel_coords = world_coords_to_voxel(voxel_coords, P)
 
         # Now voxels are in [-1, 1]^3; map to [0, V-1)^3
         voxel_coords = 0.5 * (V - 1) * (voxel_coords + 1.0)

@@ -19,6 +19,7 @@ from shapenet.evaluation import evaluate_split, evaluate_test, evaluate_test_p2m
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
+from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
 
@@ -174,6 +175,11 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             model_kwargs = {}
             if cfg.MODEL.VOXEL_ON and cp.t < cfg.MODEL.VOXEL_HEAD.VOXEL_ONLY_ITERS:
                 model_kwargs["voxel_only"] = True
+
+            module = model.module if hasattr(model, "module") else model
+            if type(module) == VoxMeshMultiViewHead:
+                model_kwargs["intrinsics"] = intrinsics
+                model_kwargs["extrinsics"] = extrinsics
             with Timer("Forward"):
                 voxel_scores, meshes_pred = model(imgs, **model_kwargs)
 
