@@ -174,7 +174,9 @@ class MeshVoxDataset(Dataset):
     def _voxelize(self, voxel_coords, P):
         V = self.voxel_size
         device = voxel_coords.device
-        voxel_coords = world_coords_to_voxel(voxel_coords, P)
+        voxel_coords = world_coords_to_voxel(
+            voxel_coords.unsqueeze(0), P.unsqueeze(0)
+        ).squeeze(0)
 
         # Now voxels are in [-1, 1]^3; map to [0, V-1)^3
         voxel_coords = 0.5 * (V - 1) * (voxel_coords + 1.0)

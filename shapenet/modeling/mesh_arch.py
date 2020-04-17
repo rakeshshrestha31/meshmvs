@@ -1,10 +1,13 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from detectron2.utils.registry import Registry
 from pytorch3d.ops import cubify
 from pytorch3d.structures import Meshes
 from pytorch3d.utils import ico_sphere
+
+import time
 
 from shapenet.modeling.backbone import build_backbone
 from shapenet.modeling.heads import MeshRefinementHead, VoxelHead
@@ -111,6 +114,20 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = sum(feat_dims)
         self.mesh_head = MeshRefinementHead(cfg)
 
+    def setup(self, cfg):
+        VoxMeshHead.setup(self, cfg)
+        self.cubify_threshold_logit = self.logit(self.cubify_threshold)
+
+    @staticmethod
+    def logit(x, eps=1e-5):
+        """
+        logit or log-odds. Inverse of sigmoid
+        """
+        if type(x) != torch.Tensor:
+            x = torch.tensor(x)
+        odds = (x / (1 - x).clamp(min=eps)).clamp(min=eps)
+        return torch.log(odds)
+
     def forward(self, imgs, intrinsics, extrinsics, voxel_only=False):
         batch_size = imgs.shape[0]
         num_views = imgs.shape[1]
@@ -138,63 +155,143 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
         return voxel_scores, refined_meshes
 
+    def grid_sample_voxel_scores(self, voxel_scores, grid):
+        """
+        wrapper around torch.nn.functional.grid_sample
+        makes sure that the out of bound voxels have proper (non-occupied) scores
+        Inputs:
+        - voxel_scores: FloatTensor of shape (N, D, H, W)
+        - grid: FloatTensor of shape (N, D, H, W)
+        """
+        # logit score that makes a cell non-occupied
+        non_occupied_score = self.cubify_threshold_logit - 1e-1
+        # simulate padding by non_occupied_score by
+        # subtracting it before grid_sample and then adding it back later
+        voxel_scores = voxel_scores - non_occupied_score
+        return F.grid_sample(
+            voxel_scores.unsqueeze(1), grid,
+            mode="bilinear", padding_mode="zeros", align_corners=True
+        ).squeeze(1) + non_occupied_score
+
     def merge_multi_view_voxels(self, voxel_scores, intrinsics, extrinsics):
         """
         Merge multive voxel scores
         Inputs:
-        - voxel_scores: tensor of shape (batch, view, channel, h, w)
+        - voxel_scores: tensor of shape (batch, view, d, h, w)
         Returns:
-        - float tensor of shape (batch, channel, h, w)
+        - float tensor of shape (batch, d, h, w)
         """
         batch_size = voxel_scores.shape[0]
         device = voxel_scores.device
         voxel_scores = voxel_scores.unbind(dim=1)
         T_ref_world = extrinsics[:, 0]
+        T_world_ref = torch.inverse(T_ref_world)
+        timestamp = int(time.time() * 1000)
 
-        from pytorch3d.io import save_obj
-        import open3d as o3d
-        import time
-        stamp = int(time.time() * 1000)
+        # compute grid points
+        grid_shape = list(voxel_scores[0].shape[-3:])
+        norm_coords = voxel_grid_coords(grid_shape)
+        grid_points_flat = voxel_coords_to_world(norm_coords.view(-1, 3)) \
+                                .view(1, -1, 3).expand(batch_size, -1, -1) \
+                                .to(device)
+
+        transformed_voxel_scores = []
+
         for view_idx, voxel_scores_view in enumerate(voxel_scores):
             T_view_world = extrinsics[:, view_idx]
-            T_world_view = torch.inverse(T_view_world)
-            T_ref_view = T_ref_world.bmm(T_world_view)
+            T_view_ref = T_view_world.bmm(T_world_ref)
 
-            voxel_probs = voxel_scores_view.sigmoid()
-            active_voxels = voxel_probs > self.cubify_threshold
-            cubified_meshes = self.cubify(voxel_scores_view)
-            cubified_meshes = transform_meshes(cubified_meshes, T_ref_view)
+            # transform to view frame to find corresponding normalized coords
+            grid_points_view = transform_verts(
+                grid_points_flat, T_view_ref
+            )[:, :, :3]
+            transformed_norm_coords = world_coords_to_voxel(grid_points_view) \
+                                            .view(batch_size, *grid_shape, 3)
+            voxel_scores_ref = self.grid_sample_voxel_scores(
+                voxel_scores_view, transformed_norm_coords,
+            )
+            transformed_voxel_scores.append(voxel_scores_ref)
+            self.save_voxel_grids_view(
+                view_idx, timestamp, voxel_scores_view,
+                voxel_scores_ref, T_view_ref
+            )
 
-            # compute grid points
-            grid_shape = list(voxel_scores_view.shape[-3:])
-            norm_coords = voxel_grid_coords(grid_shape)
-            grid_points = voxel_coords_to_world(norm_coords.view(-1, 3)) \
-                            .view(1, -1, 3).expand(batch_size, -1, -1) \
-                            .to(device)
-            # transform to ref frame
-            grid_points = transform_verts(grid_points, T_ref_view)[:, :, :3]
-            norm_transformed_coords = world_coords_to_voxel(grid_points) \
-                                        .view(batch_size, *grid_shape, 3)
-            grid_points = grid_points.view(batch_size, *grid_shape, 3)
+        merged_voxel_scores = torch.sum(
+            torch.stack(transformed_voxel_scores, dim=0), dim=0
+        )
+        self.save_merged_voxel_grids(timestamp, merged_voxel_scores)
+        return merged_voxel_scores
 
-            for batch_idx, mesh in enumerate(cubified_meshes):
-                points = grid_points[batch_idx][active_voxels[batch_idx]]
-                pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
-                    points.view(-1, 3).cpu().detach().numpy()
-                ))
-                o3d.io.write_point_cloud(
-                    '/tmp/cube_mesh_{}_{}_{}_voxels.ply'.format(
-                        stamp, batch_idx, view_idx
-                    ),
-                    pcd
-                )
+    def save_merged_voxel_grids(self, file_prefix, voxel_scores):
+        """
+        save merged voxel grids for debugging purpose
+        """
+        from pytorch3d.io import save_obj
+        import open3d as o3d
+        meshes = self.cubify(voxel_scores)
+        for batch_idx, mesh in enumerate(meshes):
+            filename = "/tmp/cube_mesh_{}_{}_merged.obj" \
+                            .format(file_prefix, batch_idx)
+            save_obj(filename, mesh.verts_packed(), mesh.faces_packed())
 
-                vertices = mesh.verts_packed()
-                faces = mesh.faces_packed()
-                save_obj('/tmp/cube_mesh_{}_{}_{}.obj'.format(
-                    stamp, batch_idx, view_idx
-                ), vertices, faces)
-                print('mesh:', vertices.shape, faces.shape)
+    def save_voxel_grids_view(
+        self, view_idx, file_prefix,
+        voxel_scores_view, voxel_scores_ref, T_view_ref
+    ):
+        """
+        save a view's voxel grids for debugging purpose
+        """
+        from pytorch3d.io import save_obj
+        import open3d as o3d
+
+        batch_size = voxel_scores_view.shape[0]
+        device = voxel_scores_view.device
+        T_ref_view = torch.inverse(T_view_ref)
+
+        voxel_probs = voxel_scores_view.sigmoid()
+        active_voxels = voxel_probs > self.cubify_threshold
+        cubified_meshes = self.cubify(voxel_scores_view)
+        cubified_meshes = transform_meshes(cubified_meshes, T_ref_view)
+
+        cubified_meshes_ref = self.cubify(voxel_scores_ref)
+
+        # compute grid points
+        grid_shape = list(voxel_scores_view.shape[-3:])
+        norm_coords = voxel_grid_coords(grid_shape)
+        grid_points_flat = voxel_coords_to_world(norm_coords.view(-1, 3)) \
+                                .view(1, -1, 3).expand(batch_size, -1, -1) \
+                                .to(device)
+
+        # transform to ref frame
+        grid_points_ref = transform_verts(
+            grid_points_flat, T_ref_view
+        )[:, :, :3].view(batch_size, *grid_shape, 3)
+
+        for batch_idx, mesh in enumerate(cubified_meshes):
+            points = grid_points_ref[batch_idx][active_voxels[batch_idx]]
+            pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                points.view(-1, 3).cpu().detach().numpy()
+            ))
+            o3d.io.write_point_cloud(
+                "/tmp/cube_mesh_{}_{}_{}_voxels.ply".format(
+                    file_prefix, batch_idx, view_idx
+                ),
+                pcd
+            )
+
+            def save_mesh(filename, mesh):
+                save_obj(filename, mesh.verts_packed(), mesh.faces_packed())
+
+            save_mesh(
+                "/tmp/cube_mesh_{}_{}_{}.obj" \
+                        .format(file_prefix, batch_idx, view_idx),
+                cubified_meshes[batch_idx]
+            )
+            save_mesh(
+                "/tmp/cube_mesh_{}_{}_{}_ref.obj" \
+                        .format(file_prefix, batch_idx, view_idx),
+                cubified_meshes_ref[batch_idx]
+            )
 
 @MESH_ARCH_REGISTRY.register()
 class SphereInitHead(nn.Module):

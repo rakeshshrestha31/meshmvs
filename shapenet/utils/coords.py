@@ -94,13 +94,17 @@ def world_coords_to_voxel(voxel_coords, P=None):
     Inverse operation of voxel_corods_to_world()
     Inputs:
     - voxel_coords: FloatTensor of shape (N, V, 3)
-    - P: 4x4 projection matrix
+    - P: 4x4 projection matrices (N, 4, 4)
     Returns:
     - FloatTensor of shape (N, V, 3) in the range [-1, 1]
     """
+    assert(len(voxel_coords.shape) == 3 and voxel_coords.shape[2] == 3)
+
+    N = voxel_coords.shape[0]
     if P is None:
-        N = voxel_coords.shape[0]
         P =  get_blender_intrinsic_matrix(N)
+    assert(len(P.shape) == 3 and list(P.shape) == [N, 4, 4])
+
     P = P.to(voxel_coords.device)
     voxel_coords = project_verts(voxel_coords, P)
 
@@ -127,8 +131,8 @@ def world_coords_to_voxel(voxel_coords, P=None):
     # range [zmin, zmax] instead runs from [-1, 1]
     m = 2.0 / (zmax - zmin)
     b = -2.0 * zmin / (zmax - zmin) - 1
-    voxel_coords[:, 2].mul_(m).add_(b)
-    voxel_coords[:, 1].mul_(-1)  # Flip y
+    voxel_coords[:, :, 2].mul_(m).add_(b)
+    voxel_coords[:, :, 1].mul_(-1)  # Flip y
 
     return voxel_coords
 
@@ -303,10 +307,6 @@ def transform_meshes(meshes, T):
     verts_list = [verts[i, :verts_per_mesh[i]] for i in range(N)]
     faces_list = copy.deepcopy(meshes.faces_list())
     meshes_world = Meshes(verts=verts_list, faces=faces_list)
-    print("verts_per_mesh:", verts_per_mesh)
-    print("verts_list:", [i.shape for i in verts_list])
-    print("faces_list:", [i.shape for i in faces_list])
-
     return meshes_world
 
 
