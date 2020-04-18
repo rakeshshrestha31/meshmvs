@@ -10,6 +10,7 @@ from meshrcnn.utils.metrics import compare_meshes
 
 import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
+from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +52,18 @@ def evaluate_test(model, data_loader, vis_preds=False):
     num_batch_evaluated = 0
     for batch in data_loader:
         batch = data_loader.postprocess(batch, device)
-        imgs, meshes_gt, _, _, _, id_strs = batch
+        imgs, meshes_gt, _, _, _, intrinsics, extrinsics, id_strs = batch
         sids = [id_str.split("-")[0] for id_str in id_strs]
         for sid in sids:
             num_instances[sid] += 1
 
         with inference_context(model):
-            voxel_scores, meshes_pred = model(imgs)
+            model_kwargs = {}
+            module = model.module if hasattr(model, "module") else model
+            if type(module) == VoxMeshMultiViewHead:
+                model_kwargs["intrinsics"] = intrinsics
+                model_kwargs["extrinsics"] = extrinsics
+            voxel_scores, meshes_pred = model(imgs, **model_kwargs)
             cur_metrics = compare_meshes(meshes_pred[-1], meshes_gt, reduce=False)
             cur_metrics["verts_per_mesh"] = meshes_pred[-1].num_verts_per_mesh().cpu()
             cur_metrics["faces_per_mesh"] = meshes_pred[-1].num_faces_per_mesh().cpu()
@@ -121,13 +127,18 @@ def evaluate_test_p2m(model, data_loader):
     num_batch_evaluated = 0
     for batch in data_loader:
         batch = data_loader.postprocess(batch, device)
-        imgs, meshes_gt, _, _, _, id_strs = batch
+        imgs, meshes_gt, _, _, _, intrinsics, extrinsics, id_strs = batch
         sids = [id_str.split("-")[0] for id_str in id_strs]
         for sid in sids:
             num_instances[sid] += 1
 
         with inference_context(model):
-            voxel_scores, meshes_pred = model(imgs)
+            model_kwargs = {}
+            module = model.module if hasattr(model, "module") else model
+            if type(module) == VoxMeshMultiViewHead:
+                model_kwargs["intrinsics"] = intrinsics
+                model_kwargs["extrinsics"] = extrinsics
+            voxel_scores, meshes_pred = model(imgs, **model_kwargs)
             # NOTE that for the F1 thresholds we take the square root of 1e-4 & 2e-4
             # as `compare_meshes` returns the euclidean distance (L2) of two pointclouds.
             # In Pixel2Mesh, the squared L2 (L2^2) is computed instead.
@@ -174,8 +185,14 @@ def evaluate_split(
     deprocess = imagenet_deprocess(rescale_image=False)
     for batch in loader:
         batch = loader.postprocess(batch, device)
-        imgs, meshes_gt, points_gt, normals_gt, voxels_gt = batch
-        voxel_scores, meshes_pred = model(imgs)
+        imgs, meshes_gt, points_gt, normals_gt, \
+                voxels_gt, intrinsics, extrinsics = batch
+        model_kwargs = {}
+        module = model.module if hasattr(model, "module") else model
+        if type(module) == VoxMeshMultiViewHead:
+            model_kwargs["intrinsics"] = intrinsics
+            model_kwargs["extrinsics"] = extrinsics
+        voxel_scores, meshes_pred = model(imgs, **model_kwargs)
 
         # Only compute metrics for the final predicted meshes, not intermediates
         cur_metrics = compare_meshes(meshes_pred[-1], meshes_gt)
