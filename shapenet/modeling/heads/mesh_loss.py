@@ -56,11 +56,18 @@ class MeshLoss(nn.Module):
         total_loss = torch.tensor(0.0).to(points_gt)
         losses = {}
 
+        losses["voxel"] = torch.tensor(0.0).to(points_gt)
         if voxel_scores is not None and voxels_gt is not None and self.voxel_weight > 0:
             voxels_gt = voxels_gt.float()
-            voxel_loss = F.binary_cross_entropy_with_logits(voxel_scores, voxels_gt)
-            total_loss = total_loss + self.voxel_weight * voxel_loss
-            losses["voxel"] = voxel_loss
+            for voxel_idx, voxel_score in enumerate(voxel_scores):
+                voxel_loss = F.binary_cross_entropy_with_logits(
+                    voxel_score, voxels_gt
+                )
+                losses["voxel"] = losses["voxel"] + voxel_loss
+                losses["voxel_%d" % voxel_idx] = voxel_loss
+            # take average to be invariant to number of views
+            losses["voxel"] = losses["voxel"] / len(voxel_scores)
+            total_loss = total_loss + self.voxel_weight * losses["voxel"]
 
         if isinstance(meshes_pred, Meshes):
             meshes_pred = [meshes_pred]

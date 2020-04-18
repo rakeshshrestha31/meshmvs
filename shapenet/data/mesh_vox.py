@@ -169,7 +169,9 @@ class MeshVoxDataset(Dataset):
             voxels, P = self.read_voxels(self.data_dir, sid, mid, iid, K, RT)
 
         id_str = "%s-%s-%02d" % (sid, mid, iid)
-        return img, verts, faces, points, normals, voxels, P, K, [RT], id_str
+        # add dim=1 for view (single-view)
+        return img, verts, faces, points, normals, voxels, \
+                    P, K, RT.unsqueeze(1), id_str
 
     def _voxelize(self, voxel_coords, P):
         V = self.voxel_size

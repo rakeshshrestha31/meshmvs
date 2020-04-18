@@ -87,15 +87,18 @@ class VoxMeshHead(nn.Module):
         device = imgs.device
 
         img_feats = self.backbone(imgs)
-        voxel_scores = self.voxel_head(img_feats[-1])
-        P = self._get_projection_matrix(N, device)
+        # voxel scores from one view only
+        voxel_scores = [self.voxel_head(img_feats[-1])]
+        # add view dimension (single view)
+        img_feats = [i.unsqueeze(1) for i in img_feats]
+        P = [self._get_projection_matrix(N, device)]
 
         if voxel_only:
             dummy_meshes = self._dummy_mesh(N, device)
             dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
             return voxel_scores, dummy_refined
 
-        cubified_meshes = self.cubify(voxel_scores)
+        cubified_meshes = self.cubify(voxel_scores[0])
         refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
         return voxel_scores, refined_meshes
 
@@ -111,7 +114,8 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
         # mesh head
-        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = sum(feat_dims)
+        # times 3 cuz multi-view (mean, avg, std) features will be used
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = sum(feat_dims) * 3
         self.mesh_head = MeshRefinementHead(cfg)
 
     def setup(self, cfg):
@@ -129,6 +133,12 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         return torch.log(odds)
 
     def forward(self, imgs, intrinsics, extrinsics, voxel_only=False):
+        """
+        Args:
+        - imgs: tensor of shape (B, V, 3, H, W)
+        - intrinsics: tensor of shape (B, V, 4, 4)
+        - extrinsics: tensor of shape (B, V, 4, 4)
+        """
         batch_size = imgs.shape[0]
         num_views = imgs.shape[1]
         device = imgs.device
@@ -141,19 +151,42 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         voxel_scores = voxel_scores.view(
             batch_size, num_views, *(voxel_scores.shape[1:])
         )
+        img_feats = [
+            i.view(batch_size, num_views, *(i.shape[1:])) for i in img_feats
+        ]
 
-        P = self._get_projection_matrix(batch_size, device)
-        self.merge_multi_view_voxels(voxel_scores, intrinsics, extrinsics)
-        exit(0)
+        K = self._get_projection_matrix(batch_size, device)
+        rel_extrinsics = self.relative_extrinsics(extrinsics)
+        P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
+        voxel_scores = self.merge_multi_view_voxels(voxel_scores, extrinsics)
 
         if voxel_only:
             dummy_meshes = self._dummy_mesh(batch_size, device)
             dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
             return voxel_scores, dummy_refined
 
-        cubified_meshes = self.cubify(voxel_scores)
+        cubified_meshes = self.cubify(voxel_scores[0])
         refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
         return voxel_scores, refined_meshes
+
+    @staticmethod
+    def relative_extrinsics(extrinsics):
+        """
+        Converts extrinsics in world frame to reference frame
+
+        Args:
+        - extrinsics: tensors of size (batch, view, 4, 4)
+
+        Returns:
+        - tensors of size (batch, view, 4, 4)
+        """
+        T_ref_world = extrinsics[:, 0]
+        T_world_ref = torch.inverse(T_ref_world)
+        rel_extrinsics = torch.stack([
+            T_view_world.bmm(T_world_ref)
+            for T_view_world in  extrinsics.unbind(dim=1)
+        ], dim=1)
+        return rel_extrinsics
 
     def grid_sample_voxel_scores(self, voxel_scores, grid):
         """
@@ -162,6 +195,8 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         Inputs:
         - voxel_scores: FloatTensor of shape (N, D, H, W)
         - grid: FloatTensor of shape (N, D, H, W)
+        Returns:
+        - FloatTensor of shape (N, D, H, W)
         """
         # logit score that makes a cell non-occupied
         non_occupied_score = self.cubify_threshold_logit - 1e-1
@@ -173,13 +208,16 @@ class VoxMeshMultiViewHead(VoxMeshHead):
             mode="bilinear", padding_mode="zeros", align_corners=True
         ).squeeze(1) + non_occupied_score
 
-    def merge_multi_view_voxels(self, voxel_scores, intrinsics, extrinsics):
+    def merge_multi_view_voxels(self, voxel_scores, extrinsics):
         """
         Merge multive voxel scores
         Inputs:
         - voxel_scores: tensor of shape (batch, view, d, h, w)
+        - extrinsics: tensors  of size (batch, view, 4, 4)
         Returns:
-        - float tensor of shape (batch, d, h, w)
+        - list of float tensor of shape (batch, d, h, w).
+            Merged voxel scores (first element) along with the score of each view
+            in the same coordinate frame
         """
         batch_size = voxel_scores.shape[0]
         device = voxel_scores.device
@@ -191,9 +229,9 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         # compute grid points
         grid_shape = list(voxel_scores[0].shape[-3:])
         norm_coords = voxel_grid_coords(grid_shape)
-        grid_points_flat = voxel_coords_to_world(norm_coords.view(-1, 3)) \
-                                .view(1, -1, 3).expand(batch_size, -1, -1) \
-                                .to(device)
+        grid_points = voxel_coords_to_world(norm_coords.view(-1, 3)) \
+                            .view(1, -1, 3).expand(batch_size, -1, -1) \
+                            .to(device)
 
         transformed_voxel_scores = []
 
@@ -203,7 +241,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
 
             # transform to view frame to find corresponding normalized coords
             grid_points_view = transform_verts(
-                grid_points_flat, T_view_ref
+                grid_points, T_view_ref
             )[:, :, :3]
             transformed_norm_coords = world_coords_to_voxel(grid_points_view) \
                                             .view(batch_size, *grid_shape, 3)
@@ -211,16 +249,18 @@ class VoxMeshMultiViewHead(VoxMeshHead):
                 voxel_scores_view, transformed_norm_coords,
             )
             transformed_voxel_scores.append(voxel_scores_ref)
-            self.save_voxel_grids_view(
-                view_idx, timestamp, voxel_scores_view,
-                voxel_scores_ref, T_view_ref
-            )
+            # self.save_voxel_grids_view(
+            #     view_idx, timestamp, voxel_scores_view,
+            #     voxel_scores_ref, T_view_ref
+            # )
 
+        # adding the scores (which are actually the log-odds)
+        # is equivalent to Bayesian update of occupancy probabilities
         merged_voxel_scores = torch.sum(
             torch.stack(transformed_voxel_scores, dim=0), dim=0
         )
-        self.save_merged_voxel_grids(timestamp, merged_voxel_scores)
-        return merged_voxel_scores
+        # self.save_merged_voxel_grids(timestamp, merged_voxel_scores)
+        return [merged_voxel_scores, *transformed_voxel_scores]
 
     def save_merged_voxel_grids(self, file_prefix, voxel_scores):
         """
@@ -318,7 +358,10 @@ class SphereInitHead(nn.Module):
         device = imgs.device
 
         img_feats = self.backbone(imgs)
-        P = self._get_projection_matrix(N, device)
+        # add view dimension (single view)
+        img_feats = [i.unsqueeze(1) for i in img_feats]
+
+        P = [self._get_projection_matrix(N, device)]
 
         init_meshes = ico_sphere(self.ico_sphere_level, device).extend(N)
         refined_meshes = self.mesh_head(img_feats, init_meshes, P)
@@ -350,7 +393,10 @@ class Pixel2MeshHead(nn.Module):
         device = imgs.device
 
         img_feats = self.backbone(imgs)
-        P = self._get_projection_matrix(N, device)
+        # add view dimension (single view)
+        img_feats = [i.unsqueeze(1) for i in img_feats]
+
+        P = [self._get_projection_matrix(N, device)]
 
         init_meshes = ico_sphere(self.ico_sphere_level, device).extend(N)
         refined_meshes = self.mesh_head(img_feats, init_meshes, P, subdivide=True)
