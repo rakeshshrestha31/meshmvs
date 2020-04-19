@@ -15,6 +15,7 @@ from shapenet.utils.coords import get_blender_intrinsic_matrix, voxel_to_world
 from shapenet.utils.coords import transform_meshes, transform_verts
 from shapenet.utils.coords import world_coords_to_voxel, voxel_coords_to_world
 from shapenet.utils.coords import voxel_grid_coords
+from shapenet.data.utils import imagenet_deprocess
 
 MESH_ARCH_REGISTRY = Registry("MESH_ARCH")
 
@@ -155,6 +156,9 @@ class VoxMeshMultiViewHead(VoxMeshHead):
             i.view(batch_size, num_views, *(i.shape[1:])) for i in img_feats
         ]
 
+        # debug only
+        # save_images(imgs)
+
         K = self._get_projection_matrix(batch_size, device)
         rel_extrinsics = self.relative_extrinsics(extrinsics)
         P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
@@ -262,6 +266,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         # self.save_merged_voxel_grids(timestamp, merged_voxel_scores)
         return [merged_voxel_scores, *transformed_voxel_scores]
 
+    @torch.no_grad()
     def save_merged_voxel_grids(self, file_prefix, voxel_scores):
         """
         save merged voxel grids for debugging purpose
@@ -274,6 +279,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
                             .format(file_prefix, batch_idx)
             save_obj(filename, mesh.verts_packed(), mesh.faces_packed())
 
+    @torch.no_grad()
     def save_voxel_grids_view(
         self, view_idx, file_prefix,
         voxel_scores_view, voxel_scores_ref, T_view_ref
@@ -406,3 +412,25 @@ class Pixel2MeshHead(nn.Module):
 def build_model(cfg):
     name = cfg.MODEL.MESH_HEAD.NAME
     return MESH_ARCH_REGISTRY.get(name)(cfg)
+
+
+@torch.no_grad()
+def save_images(imgs):
+    """
+    Args:
+    - imgs: tensor of shape (B, V, C, H, W)
+    """
+    import cv2
+    timestamp = int(time.time() * 1000)
+    transform = imagenet_deprocess(False)
+    for batch_idx in range(imgs.shape[0]):
+        for view_idx in range(imgs.shape[1]):
+            img = imgs[batch_idx, view_idx]
+            img = transform(img) * 255
+            img = img.type(torch.uint8).cpu().detach() \
+                     .permute(1, 2, 0).numpy()
+            # white background
+            img[img == 0] = 255
+            filename = "/tmp/image_{}_{}_{}.png" \
+                            .format(timestamp, batch_idx, view_idx)
+            cv2.imwrite(filename, img)
