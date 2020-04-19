@@ -4,6 +4,7 @@
 import copy
 import math
 import torch
+import torch.nn.functional as F
 from pytorch3d.structures import Meshes
 
 SHAPENET_MIN_ZMIN = 0.67
@@ -333,3 +334,43 @@ def voxel_grid_coords(grid_shape):
 
     points = torch.stack([xx, yy, zz], dim=-1)
     return points
+
+
+def relative_extrinsics(extrinsics, T_ref_world):
+    """
+    Converts extrinsics in world frame to reference frame
+
+    Args:
+    - extrinsics: tensors of size (batch, view, 4, 4)
+                  with T_view_world transforms
+    - T_ref_world: tensor of size (batch, 4, 4)
+                   with reference coordinate frame transformation
+
+    Returns:
+    - tensors of size (batch, view, 4, 4) with T_view_ref transforms
+    """
+    T_world_ref = torch.inverse(T_ref_world)
+
+    rel_extrinsics = torch.stack([
+        T_view_world.bmm(T_world_ref)
+        for T_view_world in  extrinsics.unbind(dim=1)
+    ], dim=1)
+
+    return rel_extrinsics
+
+
+def custom_padded_grid_sample(input, grid, pad_value=0.0, **kwargs):
+    """
+    wrapper around torch.nn.functional.grid_sample for custom value padding
+    Inputs:
+    - voxel_scores: FloatTensor of shape (N, D, H, W)
+    - grid: FloatTensor of shape (N, D, H, W)
+    - kwargs: addtional keyword args for torch.nn.grid_sample
+    Returns:
+    - FloatTensor of shape (N, D, H, W)
+    """
+    # simulate custom padding by subtracting it before grid_sample
+    # and then adding it back later
+    input = input - pad_value
+    return F.grid_sample(input, grid, padding_mode="zeros", **kwargs) \
+                + pad_value
