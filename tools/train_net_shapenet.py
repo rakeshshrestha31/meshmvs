@@ -19,7 +19,7 @@ from shapenet.evaluation import evaluate_split, evaluate_test, evaluate_test_p2m
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
-from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead
+from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
 
@@ -103,6 +103,7 @@ def main_worker(worker_id, args):
             output_device=worker_id,
             check_reduction=True,
             broadcast_buffers=False,
+            # find_unused_parameters=True,
         )
 
     optimizer = build_optimizer(cfg, model)
@@ -177,7 +178,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 model_kwargs["voxel_only"] = True
 
             module = model.module if hasattr(model, "module") else model
-            if type(module) == VoxMeshMultiViewHead:
+            if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
                 model_kwargs["intrinsics"] = intrinsics
                 model_kwargs["extrinsics"] = extrinsics
             with Timer("Forward"):
@@ -263,7 +264,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             # summed, so each GPU has the same gradients.
             num_infinite_grad = 0
             for p in params:
-                num_infinite_grad += (torch.isfinite(p.grad) == 0).sum().item()
+                if p.grad is not None:
+                    num_infinite_grad += (torch.isfinite(p.grad) == 0).sum() \
+                                                                      .item()
             if num_infinite_grad == 0:
                 optimizer.step()
             else:

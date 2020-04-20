@@ -10,7 +10,7 @@ from meshrcnn.utils.metrics import compare_meshes
 
 import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
-from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead
+from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def evaluate_test(model, data_loader, vis_preds=False):
         with inference_context(model):
             model_kwargs = {}
             module = model.module if hasattr(model, "module") else model
-            if type(module) == VoxMeshMultiViewHead:
+            if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
                 model_kwargs["intrinsics"] = intrinsics
                 model_kwargs["extrinsics"] = extrinsics
             voxel_scores, meshes_pred = model(imgs, **model_kwargs)
@@ -135,7 +135,7 @@ def evaluate_test_p2m(model, data_loader):
         with inference_context(model):
             model_kwargs = {}
             module = model.module if hasattr(model, "module") else model
-            if type(module) == VoxMeshMultiViewHead:
+            if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
                 model_kwargs["intrinsics"] = intrinsics
                 model_kwargs["extrinsics"] = extrinsics
             voxel_scores, meshes_pred = model(imgs, **model_kwargs)
@@ -189,7 +189,7 @@ def evaluate_split(
                 voxels_gt, intrinsics, extrinsics = batch
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
-        if type(module) == VoxMeshMultiViewHead:
+        if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
             model_kwargs["intrinsics"] = intrinsics
             model_kwargs["extrinsics"] = extrinsics
         voxel_scores, meshes_pred = model(imgs, **model_kwargs)

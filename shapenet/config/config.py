@@ -12,8 +12,11 @@ def get_shapenet_cfg():
     cfg = CN()
     cfg.MODEL = CN()
     cfg.MODEL.BACKBONE = "resnet50"
+    cfg.MODEL.DEPTH_BACKBONE = "resnet50"
     cfg.MODEL.VOXEL_ON = False
     cfg.MODEL.MESH_ON = False
+    cfg.MODEL.CONTRASTIVE_DEPTH_INPUT = True
+    cfg.MODEL.RGB_FEATURES_INPUT = False
 
     # ------------------------------------------------------------------------ #
     # Checkpoint
@@ -55,6 +58,17 @@ def get_shapenet_cfg():
     cfg.MODEL.MESH_HEAD.EDGE_LOSS_WEIGHT = 1.0
     # Init ico_sphere level (only for when voxel_on is false)
     cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL = -1
+
+    cfg.MODEL.MVSNET = CN()
+    cfg.MODEL.MVSNET.FEATURES_LIST = [32, 64, 128, 256]
+    cfg.MODEL.MVSNET.CHECKPOINT = ""
+    cfg.MODEL.MVSNET.FREEZE = False
+    cfg.MODEL.MVSNET.MIN_DEPTH = 0.1
+    cfg.MODEL.MVSNET.DEPTH_INTERVAL = 0.025
+    cfg.MODEL.MVSNET.NUM_DEPTHS = 48
+    cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE = (224, 224)
+    cfg.MODEL.MVSNET.FOCAL_LENGTH = (248, 248)
+    cfg.MODEL.MVSNET.PRINCIPAL_POINT = (111.5, 111.5)
 
     # ------------------------------------------------------------------------ #
     # Solver
