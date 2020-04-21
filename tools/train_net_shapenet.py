@@ -41,11 +41,18 @@ def copy_data(args):
     args.data_dir = os.path.join(args.tmp_dir, data_base)
     logger.info("args.data_dir = %s" % args.data_dir)
 
+
 def get_dataset_name(cfg):
-    if cfg.DATASETS.MULTI_VIEW:
+    if cfg.DATASETS.TYPE.lower() == "multi_view":
         return "MeshVoxMultiView"
-    else:
+    elif cfg.DATASETS.TYPE.lower() == "depth":
+        return "MeshVoxDepth"
+    elif cfg.DATASETS.TYPE.lower() == "single_view":
         return "MeshVox"
+    else:
+        print("unrecognized dataset type", cfg.DATASETS.TYPE)
+        exit(1)
+
 
 def main_worker_eval(worker_id, args):
 
@@ -162,8 +169,6 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             else:
                 iteration_timer.tick()
             batch = loaders["train"].postprocess(batch, device)
-            imgs, meshes_gt, points_gt, normals_gt, voxels_gt, \
-                    intrinsics, extrinsics = batch
 
             num_infinite_params = 0
             for p in params:
@@ -179,10 +184,12 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
 
             module = model.module if hasattr(model, "module") else model
             if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
-                model_kwargs["intrinsics"] = intrinsics
-                model_kwargs["extrinsics"] = extrinsics
+                model_kwargs["intrinsics"] = batch["intrinsics"]
+                model_kwargs["extrinsics"] = batch["extrinsics"]
+            if type(module) == VoxMeshDepthHead:
+                model_kwargs["masks"] = batch["masks"]
             with Timer("Forward"):
-                voxel_scores, meshes_pred = model(imgs, **model_kwargs)
+                voxel_scores, meshes_pred = model(batch["imgs"], **model_kwargs)
 
             num_infinite = 0
             for cur_meshes in meshes_pred:
@@ -195,7 +202,8 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             loss, losses = None, {}
             if num_infinite == 0:
                 loss, losses = loss_fn(
-                    voxel_scores, meshes_pred, voxels_gt, (points_gt, normals_gt)
+                    voxel_scores, meshes_pred, batch["voxels"],
+                    (batch["points"], batch["normals"])
                 )
             skip = loss is None
             if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:

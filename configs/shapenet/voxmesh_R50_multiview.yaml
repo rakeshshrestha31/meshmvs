@@ -23,7 +23,7 @@ MODEL:
     EDGE_LOSS_WEIGHT: 0.2
 DATASETS:
   NAME: "shapenet"
-  MULTI_VIEW: true
+  TYPE: "multi_view"
 SOLVER:
   BATCH_SIZE: 64 # 32
   BATCH_SIZE_EVAL: 8

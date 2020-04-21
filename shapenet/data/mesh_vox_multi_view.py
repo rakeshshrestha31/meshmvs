@@ -73,9 +73,6 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
                     self.synset_ids.append(sid)
                     self.model_ids.append(mid)
 
-    def __len__(self):
-        return len(self.synset_ids)
-
     def __getitem__(self, idx):
         sid = self.synset_ids[idx]
         mid = self.model_ids[idx]
@@ -116,6 +113,8 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
             )
 
         id_str = "%s-%s-%02d" % (sid, mid, ref_iid)
-        return imgs, verts, faces, points, normals, \
-               voxels, P, K, extrinsics, id_str
-
+        return {
+            "imgs": imgs, "verts": verts, "faces": faces, "points": points,
+            "normals": normals, "voxels": voxels, "Ps": P, "id_str": id_str,
+            "intrinsics": K, "extrinsics": extrinsics
+        }

@@ -30,7 +30,7 @@ MODEL:
     FREEZE: False
 DATASETS:
   NAME: "shapenet"
-  MULTI_VIEW: true
+  TYPE: "depth"
 SOLVER:
   BATCH_SIZE: 64 # 32
   BATCH_SIZE_EVAL: 8

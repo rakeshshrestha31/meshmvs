@@ -173,7 +173,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
                 = (sum(rgb_feat_dims) + sum(post_voxel_depth_feat_dims)) * 3
         self.mesh_head = MeshRefinementHead(cfg)
 
-    def predict_depths(self, imgs, extrinsics):
+    def predict_depths(self, imgs, masks, extrinsics):
         """
         Gets predicted depths and depth features
 
@@ -188,19 +188,31 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         """
         mvsnet_output = self.mvsnet(imgs, extrinsics)
         # flatten batch/size and add channel dimension: (B*V, 1, H, W)
-        depths = mvsnet_output["depths"].unsqueeze(2)
-        depths = depths.view(-1, *(depths.shape[2:]))
-        depths = F.interpolate(
-            depths, imgs.shape[-2:], mode="bilinear", align_corners=False
-        )
+
+        def interpolate(tensor, size):
+            """ (B, V, H1, W1) -> (B*V, 1, H1, W1)
+            """
+            # (B, V, 1, H, W)
+            tensor = tensor.unsqueeze(2)
+            # (B*V, 1, H, W)
+            tensor = tensor.view(-1, *(tensor.shape[2:]))
+            # (B*V, 1, H, W)
+            return F.interpolate(
+                tensor, size, mode="bilinear", align_corners=False
+            )
+
+        depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])
+        masks = interpolate(masks, imgs.shape[-2:])
+        depths = depths * masks
+
         # features shape: (B*V, C, H, W)
         depth_feats = self.pre_voxel_depth_cnn(depths)
         batch_size, num_views = mvsnet_output["depths"].shape[:2]
         # (B, V, 1, H, W)
-        depth = depths.view(batch_size, num_views, *(depths.shape[1:]))
-        return depth, depth_feats
+        depths = depths.view(batch_size, num_views, *(depths.shape[1:]))
+        return depths, depth_feats
 
-    def forward(self, imgs, intrinsics, extrinsics, voxel_only=False):
+    def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False):
         """
         Args:
         - imgs: tensor of shape (B, V, 3, H, W)
@@ -217,7 +229,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         else:
             img_feats = []
 
-        depths, depth_feats = self.predict_depths(imgs, extrinsics)
+        depths, depth_feats = self.predict_depths(imgs, masks, extrinsics)
 
         # debug only
         # timestamp = int(time.time() * 1000)

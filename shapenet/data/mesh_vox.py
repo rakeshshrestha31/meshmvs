@@ -6,6 +6,7 @@ import torch
 from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.structures import Meshes
 from torch.utils.data import Dataset
+from torch.utils.data.dataloader import default_collate
 
 import torchvision.transforms as T
 from PIL import Image
@@ -170,8 +171,12 @@ class MeshVoxDataset(Dataset):
 
         id_str = "%s-%s-%02d" % (sid, mid, iid)
         # add dim=1 for view (single-view)
-        return img, verts, faces, points, normals, voxels, \
-                    P, K, RT.unsqueeze(1), id_str
+        return {
+            "imgs": imgs, "verts": verts, "faces": faces, "points": points,
+            "voxels": normals, "voxels": voxels,
+            "Ps": P, "intrinsics": K, "extrinsics": RT.unsqueeze(1),
+            "id_str": id_str
+        }
 
     def _voxelize(self, voxel_coords, P):
         V = self.voxel_size
@@ -194,69 +199,102 @@ class MeshVoxDataset(Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        imgs, verts, faces, points, normals, voxels, \
-                Ps, Ks, extrinsics, id_strs = zip(*batch)
-        imgs = torch.stack(imgs, dim=0)
-        if verts[0] is not None and faces[0] is not None:
+        """
+        Args:
+        - batch: list of dicts
+        Returns:
+        - dicts with collated items
+        """
+        assert(len(batch))
+
+        # these need special treatment
+        non_standard_collate_keys = [
+            "verts", "faces", "points", "normals", "voxels", "Ps", "id_str"
+        ]
+        standard_batch = [{
+            key: value for key, value in batch_item.items()
+            if key not in non_standard_collate_keys
+        } for batch_item in batch]
+        collated_batch = default_collate(standard_batch)
+
+        def extract_key(batch, key):
+            return [ i[key] for i in batch ]
+
+        if batch[0]["verts"] is not None and batch[0]["faces"] is not None:
             # TODO(gkioxari) Meshes should accept tuples
-            meshes = Meshes(verts=list(verts), faces=list(faces))
+            collated_batch["meshes"] = Meshes(
+                verts=extract_key(batch, "verts"),
+                faces=extract_key(batch, "faces")
+            )
         else:
-            meshes = None
-        if points[0] is not None and normals[0] is not None:
-            points = torch.stack(points, dim=0)
-            normals = torch.stack(normals, dim=0)
-        else:
-            points, normals = None, None
-        if voxels[0] is None:
+            collated_batch["meshes"] = None
+
+        if batch[0]["voxels"] is None:
             voxels = None
             Ps = None
-        elif voxels[0].dim() == 2:
+        elif batch[0]["voxels"].dim() == 2:
             # They are voxel coords
-            Ps = torch.stack(Ps, dim=0)
-        elif voxels[0].dim() == 3:
+            collated_batch["voxels"] = extract_key(batch, "voxels")
+        elif batch[0]["voxels"].dim() == 3:
             # They are actual voxels
-            voxels = torch.stack(voxels, dim=0)
+            collated_batch["voxels"] = none_safe_collate_fn(batch, "voxels")
 
-        # stack multiple views' intrinsics/extrinsics
-        Ks = torch.stack(Ks, dim=0)
-        extrinsics = torch.stack(extrinsics, dim=0)
+        def none_safe_collate_fn(batch, key):
+            """
+            Simple collate with protection against None items
+            """
+            items = extract_key(batch, key)
+            if None not in items:
+                return torch.stack(items, dim=0)
+            else:
+                return None
 
-        return imgs, meshes, points, normals, voxels, Ps, Ks, extrinsics, id_strs
+        collated_batch["points"] = none_safe_collate_fn(batch, "points")
+        collated_batch["normals"] = none_safe_collate_fn(batch, "normals")
+        collated_batch["Ps"] = none_safe_collate_fn(batch, "Ps")
+        collated_batch["id_strs"] = extract_key(batch, "id_str")
+
+        return collated_batch
 
     def postprocess(self, batch, device=None):
         if device is None:
             device = torch.device("cuda")
-        imgs, meshes, points, normals, voxels, Ps, Ks, extrinsics, id_strs \
-                = batch
-        imgs = imgs.to(device)
-        if meshes is not None:
-            meshes = meshes.to(device)
-        if points is not None and normals is not None:
-            points = points.to(device)
-            normals = normals.to(device)
+        non_standard_keys = ["points", "normals", "voxels", "id_strs"]
+
+        # process standard items
+        processed_batch = {
+            key: (value.to(device) if value is not None else None)
+            for key, value in batch.items()
+            if key not in non_standard_keys
+        }
+
+        # process non-standard items
+        if batch["points"] is not None and batch["normals"] is not None:
+            processed_batch["points"] = batch["points"].to(device)
+            processed_batch["normals"] = batch["normals"].to(device)
         else:
-            points, normals = sample_points_from_meshes(
-                meshes, num_samples=self.num_samples, return_normals=True
-            )
-        if voxels is not None:
-            if torch.is_tensor(voxels):
+            processed_batch["points"], processed_batch["normals"] = \
+                sample_points_from_meshes(
+                    batch["meshes"], num_samples=self.num_samples,
+                    return_normals=True
+                )
+        if batch["voxels"] is not None:
+            if torch.is_tensor(batch["voxels"]):
                 # We used cached voxels on disk, just cast and return
-                voxels = voxels.to(device)
+                processed_batch["voxels"] = batch["voxels"].to(device)
             else:
                 # We got a list of voxel_coords, and need to compute voxels on-the-fly
-                voxel_coords = voxels
-                Ps = Ps.to(device)
+                voxel_coords = batch["voxels"]
                 voxels = []
                 for i, cur_voxel_coords in enumerate(voxel_coords):
                     cur_voxel_coords = cur_voxel_coords.to(device)
-                    cur_voxels = self._voxelize(cur_voxel_coords, Ps[i])
+                    cur_voxels = self._voxelize(
+                        cur_voxel_coords, batch["Ps"][i]
+                    )
                     voxels.append(cur_voxels)
-                voxels = torch.stack(voxels, dim=0)
+                processed_batch["voxels"] = torch.stack(voxels, dim=0)
 
-        Ks = Ks.to(device)
-        extrinsics = extrinsics.to(device)
         if self.return_id_str:
-            return imgs, meshes, points, normals, voxels, \
-                    Ks, extrinsics, id_strs
-        else:
-            return imgs, meshes, points, normals, voxels, Ks, extrinsics
+            processed_batch["id_strs"] = batch["id_strs"]
+
+        return processed_batch

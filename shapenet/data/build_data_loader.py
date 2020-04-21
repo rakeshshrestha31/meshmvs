@@ -8,6 +8,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 from .mesh_vox import MeshVoxDataset
 from .mesh_vox_multi_view import MeshVoxMultiViewDataset
+from .mesh_vox_depth import MeshVoxDepthDataset
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,9 @@ def build_data_loader(
     elif dataset == "MeshVoxMultiView":
         dset = MeshVoxMultiViewDataset(**dataset_args)
         collate_fn = MeshVoxMultiViewDataset.collate_fn
-
+    elif dataset == "MeshVoxDepth":
+        dset = MeshVoxDepthDataset(**dataset_args)
+        collate_fn = MeshVoxDepthDataset.collate_fn
     else:
         raise ValueError("Dataset %s not registered" % dataset)
 
