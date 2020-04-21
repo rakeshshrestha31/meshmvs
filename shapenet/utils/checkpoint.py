@@ -76,12 +76,20 @@ class Checkpoint(object):
             k = self.early_stop_metric
             if k not in self.metrics:
                 best = True
+                if k is not None:
+                    logger.info(
+                        "early_stop_metric %s not found. Available: %r" % \
+                            (k, list(self.metrics.keys()))
+                    )
             else:
                 max_v = max(self.metrics[k])
                 last_v = self.metrics[k][-1]
                 last_t = self.metrics_ts[k][-1]
                 if self.t == last_t and last_v == max_v:
                     best = True
+                    logger.info(
+                        "best %r: %r, at iteration %r" % (k, last_v, last_t)
+                    )
                 else:
                     best = False
 
