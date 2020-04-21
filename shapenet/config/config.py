@@ -69,6 +69,8 @@ def get_shapenet_cfg():
     cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE = (224, 224)
     cfg.MODEL.MVSNET.FOCAL_LENGTH = (248, 248)
     cfg.MODEL.MVSNET.PRINCIPAL_POINT = (111.5, 111.5)
+    # loss weights
+    cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT = 0.1
 
     # ------------------------------------------------------------------------ #
     # Solver
