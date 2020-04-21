@@ -33,6 +33,7 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
         sample_online=False,
         in_memory=False,
         return_id_str=False,
+        depth_only=False,
     ):
         MeshVoxMultiViewDataset.__init__(
             self, data_dir, normalize_images=normalize_images,
@@ -40,6 +41,10 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
             num_samples=num_samples, sample_online=sample_online,
             in_memory=in_memory, return_id_str=return_id_str
         )
+        self.set_depth_only(depth_only)
+
+    def set_depth_only(self, value):
+        self.depth_only = value
 
     @staticmethod
     def read_depth(data_dir, sid, mid, iid):
@@ -67,8 +72,26 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
         # TODO: get mask from the alpha channel of RGB instead
         masks = (depths > 1e-7).float()
 
-        return {
-            **MeshVoxMultiViewDataset.__getitem__(self, idx),
-            "depths": depths, "masks": masks
-        }
+        if self.depth_only:
+            # depths, masks, images and camera parameters
+            metadata = self.read_camera_parameters(self.data_dir, sid, mid)
+            K = metadata["intrinsic"]
+            imgs = torch.stack([
+                self.transform(self.read_image(
+                    self.data_dir, sid, mid, metadata["image_list"][iid]
+                ))
+                for iid in self.image_ids
+            ], dim=0)
+            extrinsics = torch.stack(
+                [metadata["extrinsics"][iid] for iid in self.image_ids], dim=0
+            )
+            return {
+                "depths": depths, "masks": masks, "imgs": imgs,
+                "intrinsics": K, "extrinsics": extrinsics
+            }
+        else:
+            return {
+                **MeshVoxMultiViewDataset.__getitem__(self, idx),
+                "depths": depths, "masks": masks
+            }
 
