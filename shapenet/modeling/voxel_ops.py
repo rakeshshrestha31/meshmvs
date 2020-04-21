@@ -107,7 +107,7 @@ def merge_multi_view_voxels(
             voxel_scores_view.unsqueeze(1), transformed_norm_coords,
             pad_value=max_non_occupied_score,
             mode="bilinear", align_corners=True
-        ).squeeze(0)
+        ).squeeze(1)
         transformed_voxel_scores.append(voxel_scores_ref)
         # save_voxel_grids_view(
         #     view_idx, timestamp, voxel_scores_view,
