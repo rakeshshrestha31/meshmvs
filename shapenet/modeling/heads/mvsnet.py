@@ -3,6 +3,8 @@ import torch.nn as nn
 from torch.nn import MaxPool1d
 import torch.nn.functional as F
 
+from shapenet.utils import  clean_state_dict
+
 import numpy as np
 
 # transformation to align with Pixel2Mesh (shapenet) coordinate frame
@@ -113,6 +115,11 @@ class MVSNet(nn.Module):
             state_dict = torch.load(cfg.CHECKPOINT)
             if "model" in state_dict:
                 state_dict = state_dict["model"]
+            elif "best_states" in state_dict \
+                    and "model" in state_dict["best_states"]:
+                state_dict = clean_state_dict(
+                    state_dict["best_states"]["model"]
+                )
             self.load_state_dict(state_dict)
 
         for param in self.parameters():
