@@ -65,7 +65,11 @@ def evaluate_test(model, data_loader, vis_preds=False):
                 model_kwargs["extrinsics"] = batch["extrinsics"]
             if type(module) == VoxMeshDepthHead:
                 model_kwargs["masks"] = batch["masks"]
-            voxel_scores, meshes_pred = model(batch["imgs"], **model_kwargs)
+
+            model_outputs = model(batch["imgs"], **model_kwargs)
+            voxel_scores = model_outputs["voxel_scores"]
+            meshes_pred = model_outputs["meshes_pred"]
+
             cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"], reduce=False)
             cur_metrics["verts_per_mesh"] = meshes_pred[-1].num_verts_per_mesh().cpu()
             cur_metrics["faces_per_mesh"] = meshes_pred[-1].num_faces_per_mesh().cpu()
@@ -141,7 +145,11 @@ def evaluate_test_p2m(model, data_loader):
                 model_kwargs["extrinsics"] = batch["extrinsics"]
             if type(module) == VoxMeshDepthHead:
                 model_kwargs["masks"] = batch["masks"]
-            voxel_scores, meshes_pred = model(batch["imgs"], **model_kwargs)
+
+            model_outputs = model(batch["imgs"], **model_kwargs)
+            voxel_scores = model_outputs["voxel_scores"]
+            meshes_pred = model_outputs["meshes_pred"]
+
             # NOTE that for the F1 thresholds we take the square root of 1e-4 & 2e-4
             # as `compare_meshes` returns the euclidean distance (L2) of two pointclouds.
             # In Pixel2Mesh, the squared L2 (L2^2) is computed instead.
@@ -195,7 +203,9 @@ def evaluate_split(
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if type(module) == VoxMeshDepthHead:
             model_kwargs["masks"] = batch["masks"]
-        voxel_scores, meshes_pred = model(batch["imgs"], **model_kwargs)
+        model_outputs = model(batch["imgs"], **model_kwargs)
+        voxel_scores = model_outputs["voxel_scores"]
+        meshes_pred = model_outputs["meshes_pred"]
 
         # Only compute metrics for the final predicted meshes, not intermediates
         cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"])
