@@ -3,6 +3,7 @@ import logging
 import os
 import numpy as np
 import torch
+import torch.nn.functional as F
 from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.structures import Meshes
 from torch.utils.data import Dataset
@@ -60,21 +61,35 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
             print('depth file not found:', depth_file)
             exit(1)
 
+    @staticmethod
+    def read_mask(data_dir, sid, mid, img_path):
+        img_path = os.path.join(data_dir, sid, mid, "images", img_path)
+        rgbda_img = cv2.imread(img_path, -1)
+        mask = rgbda_img[:, :, -1]
+        mask = mask > 1e-7
+        return torch.from_numpy(mask).float()
+
     def __getitem__(self, idx):
         sid = self.synset_ids[idx]
         mid = self.model_ids[idx]
+        metadata = self.read_camera_parameters(self.data_dir, sid, mid)
 
         depths = []
+        masks = []
         for iid in self.image_ids:
+            img_path = metadata["image_list"][iid]
             depths.append(self.read_depth(self.data_dir, sid, mid, iid))
+            masks.append(self.read_mask(self.data_dir, sid, mid, img_path))
 
         depths = torch.stack(depths, dim=0)
-        # TODO: get mask from the alpha channel of RGB instead
-        masks = (depths > 1e-7).float()
+        masks = torch.stack(masks, dim=0)
+        masks = F.interpolate(
+            masks.view(-1, 1, *(masks.shape[1:])),
+            depths.shape[-2:], mode="bilinear", align_corners=False
+        ).view(*(depths.shape))
 
         if self.depth_only:
             # depths, masks, images and camera parameters
-            metadata = self.read_camera_parameters(self.data_dir, sid, mid)
             K = metadata["intrinsic"]
             imgs = torch.stack([
                 self.transform(self.read_image(
