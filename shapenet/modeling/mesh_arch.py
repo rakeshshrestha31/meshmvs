@@ -60,13 +60,17 @@ class VoxMeshHead(nn.Module):
         if voxel_only:
             dummy_meshes = dummy_mesh(N, device)
             dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
-            return voxel_scores, dummy_refined
+            return {
+                "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
+            }
 
         cubified_meshes = cubify(
             voxel_scores[0], self.voxel_size, self.cubify_threshold
         )
         refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
-        return voxel_scores, refined_meshes
+        return {
+            "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
+        }
 
 
 @MESH_ARCH_REGISTRY.register()
@@ -119,22 +123,30 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         K = self._get_projection_matrix(batch_size, device)
         rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
         P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
-        voxel_scores = merge_multi_view_voxels(
+        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
             voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
             # logit score that makes a cell non-occupied
             self.cubify_threshold_logit - 1e-1
         )
+        # separate views into list items
+        voxel_scores = voxel_scores.unbind(1)
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
             dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
-            return voxel_scores, dummy_refined
+            return {
+                "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
+                "merged_voxel_scores": merged_voxel_scores,
+            }
 
         cubified_meshes = cubify(
-            voxel_scores[0], self.voxel_size, self.cubify_threshold
+            merged_voxel_scores, self.voxel_size, self.cubify_threshold
         )
         refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
-        return voxel_scores, refined_meshes
+        return {
+            "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
+            "merged_voxel_scores": merged_voxel_scores,
+        }
 
 
 @MESH_ARCH_REGISTRY.register()
@@ -183,7 +195,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         - extrinsics: tensor of shape (B, V, 4, 4)
 
         Returns:
-        - depths: tensor of shape (B, V, 1, H, W)
+        - depths: tensor of shape (B, V, H, W)
         - depth features: list of tenosrs of shape (B*V, C, H, W)
         """
         mvsnet_output = self.mvsnet(imgs, extrinsics)
@@ -192,14 +204,10 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         def interpolate(tensor, size):
             """ (B, V, H1, W1) -> (B*V, 1, H1, W1)
             """
-            # (B, V, 1, H, W)
-            tensor = tensor.unsqueeze(2)
             # (B*V, 1, H, W)
-            tensor = tensor.view(-1, *(tensor.shape[2:]))
+            tensor = tensor.view(-1, 1, *(tensor.shape[2:]))
             # (B*V, 1, H, W)
-            return F.interpolate(
-                tensor, size, mode="bilinear", align_corners=False
-            )
+            return F.interpolate(tensor, size, mode="nearest")
 
         depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])
         masks = interpolate(masks, imgs.shape[-2:])
@@ -209,8 +217,9 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         depth_feats = self.pre_voxel_depth_cnn(depths)
         batch_size, num_views = mvsnet_output["depths"].shape[:2]
         # (B, V, 1, H, W)
-        depths = depths.view(batch_size, num_views, *(depths.shape[1:]))
-        return depths, depth_feats
+        depths = depths.view(batch_size, num_views, *(depths.shape[-2:]))
+
+        return mvsnet_output["depths"], depth_feats
 
     def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False):
         """
@@ -230,11 +239,6 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             img_feats = []
 
         depths, depth_feats = self.predict_depths(imgs, masks, extrinsics)
-
-        # debug only
-        # timestamp = int(time.time() * 1000)
-        # save_images(imgs, timestamp)
-        # save_depths(depths, timestamp)
 
         # merge RGB and depth features
         if img_feats:
@@ -256,22 +260,42 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         K = self._get_projection_matrix(batch_size, device)
         rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
         P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
-        voxel_scores = merge_multi_view_voxels(
+        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
             voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
             # logit score that makes a cell non-occupied
             self.cubify_threshold_logit - 1e-1
         )
+        # separate views into list items
+        voxel_scores = voxel_scores.unbind(1)
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
             dummy_refined = self.mesh_head(rgbd_feats, dummy_meshes, P)
-            return voxel_scores, dummy_refined
+            return {
+                "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
+                "merged_voxel_scores": merged_voxel_scores,
+                "depths": depths
+            }
 
         cubified_meshes = cubify(
-            voxel_scores[0], self.voxel_size, self.cubify_threshold
+            merged_voxel_scores, self.voxel_size, self.cubify_threshold
         )
+
+        # debug only
+        # timestamp = int(time.time() * 1000)
+        # save_images(imgs, timestamp)
+        # masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
+        # save_depths(depths * masks_resized, timestamp)
+        # save_depths(masks, str(timestamp)+"_mask")
+        # save_depths(rendered_depths, str(timestamp)+"_rendered")
+        # exit(0)
+
         refined_meshes = self.mesh_head(rgbd_feats, cubified_meshes, P)
-        return voxel_scores, refined_meshes
+        return {
+            "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
+            "merged_voxel_scores": merged_voxel_scores,
+            "depths": depths
+        }
 
 
 @MESH_ARCH_REGISTRY.register()
@@ -306,7 +330,9 @@ class SphereInitHead(nn.Module):
 
         init_meshes = ico_sphere(self.ico_sphere_level, device).extend(N)
         refined_meshes = self.mesh_head(img_feats, init_meshes, P)
-        return None, refined_meshes
+        return {
+            "voxel_scores":None, "meshes_pred": refined_meshes,
+        }
 
 
 @MESH_ARCH_REGISTRY.register()
@@ -341,7 +367,9 @@ class Pixel2MeshHead(nn.Module):
 
         init_meshes = ico_sphere(self.ico_sphere_level, device).extend(N)
         refined_meshes = self.mesh_head(img_feats, init_meshes, P, subdivide=True)
-        return None, refined_meshes
+        return {
+            "voxel_scores":None, "meshes_pred": refined_meshes,
+        }
 
 
 def build_model(cfg):
@@ -374,12 +402,12 @@ def save_images(imgs, file_prefix):
 def save_depths(depths, file_prefix):
     """
     Args:
-    - depths: tensor of shape (B, V, 1, H, W)
+    - depths: tensor of shape (B, V, H, W)
     - file_prefix: prefix to use in the filename to distinguish batches
     """
     for batch_idx in range(depths.shape[0]):
         for view_idx in range(depths.shape[1]):
-            depth = depths[batch_idx, view_idx, 0] * 255
+            depth = depths[batch_idx, view_idx] * 255
             depth = depth.type(torch.uint8).cpu().detach().numpy()
             filename = "/tmp/depth_{}_{}_{}.png" \
                             .format(file_prefix, batch_idx, view_idx)

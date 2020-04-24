@@ -19,6 +19,7 @@ from shapenet.evaluation import evaluate_split, evaluate_test, evaluate_test_p2m
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
+from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
@@ -189,7 +190,12 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             if type(module) == VoxMeshDepthHead:
                 model_kwargs["masks"] = batch["masks"]
             with Timer("Forward"):
-                voxel_scores, meshes_pred = model(batch["imgs"], **model_kwargs)
+                model_outputs = model(batch["imgs"], **model_kwargs)
+                voxel_scores = model_outputs["voxel_scores"]
+                meshes_pred = model_outputs["meshes_pred"]
+                merged_voxel_scores = model_outputs.get(
+                    "merged_voxel_scores", None
+                )
 
             num_infinite = 0
             for cur_meshes in meshes_pred:
@@ -202,17 +208,27 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             loss, losses = None, {}
             if num_infinite == 0:
                 loss, losses = loss_fn(
-                    voxel_scores, meshes_pred, batch["voxels"],
+                    voxel_scores, merged_voxel_scores,
+                    meshes_pred, batch["voxels"],
                     (batch["points"], batch["normals"])
                 )
+
             skip = loss is None
             if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:
                 logger.info("WARNING: Got non-finite loss %f" % loss)
                 skip = True
+            elif "depths" in model_outputs and "depths" in batch \
+                    and not model_kwargs.get("voxel_only", False):
+                depth_loss = adaptive_berhu_loss(
+                    batch["depths"], model_outputs["depths"],
+                    batch["masks"]
+                )
+                loss = loss + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
+                losses["depth_loss"] = depth_loss
 
             if model_kwargs.get("voxel_only", False):
                 for k, v in losses.items():
-                    if k != "voxel":
+                    if "voxel" not in k:
                         losses[k] = 0.0 * v
 
             if loss is not None and cp.t % cfg.SOLVER.LOGGING_PERIOD == 0:
@@ -327,6 +343,8 @@ def eval_and_save(model, loaders, optimizer, scheduler, cp):
         """
         cp.store_metric(**train_metrics)
         cp.store_metric(**test_metrics)
+        cp.early_stop_metric = eval_split + "_F1@0.300000"
+
         cp.store_state("model", model.state_dict())
         cp.store_state("optim", optimizer.state_dict())
         cp.store_state("lr_scheduler", scheduler.state_dict())

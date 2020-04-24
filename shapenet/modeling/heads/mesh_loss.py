@@ -33,7 +33,10 @@ class MeshLoss(nn.Module):
         if chamfer_weight == 0.0 and normal_weight == 0.0 and edge_weight == 0.0:
             self.skip_mesh_loss = True
 
-    def forward(self, voxel_scores, meshes_pred, voxels_gt, meshes_gt):
+    def forward(
+        self, voxel_scores, merged_voxel_scores,
+        meshes_pred, voxels_gt, meshes_gt
+    ):
         """
         Args:
           meshes_pred: Meshes
@@ -59,9 +62,13 @@ class MeshLoss(nn.Module):
         losses["voxel"] = torch.tensor(0.0).to(points_gt)
         if voxel_scores is not None and voxels_gt is not None and self.voxel_weight > 0:
             voxels_gt = voxels_gt.float()
+            if merged_voxel_scores is not None:
+                # repeat view 0 for merged voxels
+                voxels_gt = torch.cat((voxels_gt[:, 0:1], voxels_gt), dim=1)
+                voxel_scores = [merged_voxel_scores, *voxel_scores]
             for voxel_idx, voxel_score in enumerate(voxel_scores):
                 voxel_loss = F.binary_cross_entropy_with_logits(
-                    voxel_score, voxels_gt
+                    voxel_score, voxels_gt[:, voxel_idx]
                 )
                 losses["voxel"] = losses["voxel"] + voxel_loss
                 losses["voxel_%d" % voxel_idx] = voxel_loss

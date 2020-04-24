@@ -282,16 +282,25 @@ class MeshVoxDataset(Dataset):
             if torch.is_tensor(batch["voxels"]):
                 # We used cached voxels on disk, just cast and return
                 processed_batch["voxels"] = batch["voxels"].to(device)
+                # TODO: need to transform voxel grid to all views
+                raise NotImplementedError(
+                    "need to transform voxel grid to all views"
+                )
             else:
                 # We got a list of voxel_coords, and need to compute voxels on-the-fly
                 voxel_coords = batch["voxels"]
                 voxels = []
-                for i, cur_voxel_coords in enumerate(voxel_coords):
+                for batch_idx, cur_voxel_coords in enumerate(voxel_coords):
                     cur_voxel_coords = cur_voxel_coords.to(device)
-                    cur_voxels = self._voxelize(
-                        cur_voxel_coords, batch["Ps"][i]
-                    )
-                    voxels.append(cur_voxels)
+                    voxels_views = []
+                    K = batch["intrinsics"][batch_idx]
+                    # find voxel grid in all views coordinate frames
+                    for view_idx, transform in \
+                            enumerate(batch["extrinsics"][batch_idx].unbind(0)):
+                        P = K.matmul(transform)
+                        cur_voxels = self._voxelize(cur_voxel_coords, P)
+                        voxels_views.append(cur_voxels)
+                    voxels.append(torch.stack(voxels_views, dim=0))
                 processed_batch["voxels"] = torch.stack(voxels, dim=0)
 
         if self.return_id_str:

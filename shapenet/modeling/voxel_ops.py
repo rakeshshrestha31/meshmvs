@@ -60,12 +60,40 @@ def cubify(voxel_scores, voxel_size, cubify_threshold):
     return meshes
 
 
+def transform_voxel_grid(voxel_grid, transform, max_non_occupied_score):
+    """
+    Transform voxel occupancy grid
+    Inputs:
+    - voxel_grid: tensor of shape (batch, d, h, w) with log-odds score
+    - transform: tensors  of size (batch, 4, 4)
+    - max_non_occupied_score: max logit (log-odds) score for non-occupied voxels
+    Returns:
+    - tensor of shape (batch, d, h, w).
+    """
+    grid_shape = list(voxel_grid.shape[-3:])
+    norm_coords = voxel_grid_coords(grid_shape)
+    grid_points = voxel_coords_to_world(norm_coords.view(-1, 3)) \
+                        .view(1, -1, 3).expand(batch_size, -1, -1) \
+                        .to(device)
+    # transform to view frame to find corresponding normalized coords
+    grid_points_transformed = transform_verts(grid_points, transform)[:, :, :3]
+    norm_coords_transformed = world_coords_to_voxel(grid_points_view) \
+                                   .view(batch_size, *grid_shape, 3)
+    # makes sure that the out of bound voxels
+    # have proper (non-occupied) scores
+    voxel_grid_transformed = custom_padded_grid_sample(
+        voxel_grid.unsqueeze(1), norm_coords_transformed,
+        pad_value=max_non_occupied_score, mode="bilinear", align_corners=True
+    ).squeeze(1)
+    return voxel_grid_transformed
+
+
 def merge_multi_view_voxels(
     voxel_scores, extrinsics,
     voxel_size, cubify_threshold, max_non_occupied_score
 ):
     """
-    Merge multive voxel scores
+    Merge multiview voxel scores
     Inputs:
     - voxel_scores: tensor of shape (batch, view, d, h, w)
     - extrinsics: tensors  of size (batch, view, 4, 4)
@@ -122,7 +150,7 @@ def merge_multi_view_voxels(
     # save_merged_voxel_grids(
     #     timestamp, merged_voxel_scores, voxel_size, cubify_threshold
     # )
-    return [merged_voxel_scores, *transformed_voxel_scores]
+    return merged_voxel_scores, transformed_voxel_scores
 
 
 @torch.no_grad()
