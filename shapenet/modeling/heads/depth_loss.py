@@ -11,9 +11,7 @@ def interpolate_multi_view_tensor(tensor, size):
     # (B*V, 1, H, W)
     tensor = tensor.view(-1, *(tensor.shape[2:]))
     # (B, V, , H, W)
-    return F.interpolate(
-        tensor, size, mode="bilinear", align_corners=False
-    ).view(B, V, *size)
+    return F.interpolate(tensor, size, mode="nearest").view(B, V, *size)
 
 
 def adaptive_berhu_loss(depth_gt, depth_est, mask, threshold=0.2):
