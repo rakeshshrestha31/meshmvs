@@ -1,0 +1,3 @@
+[submodule "external/neural_renderer"]
+	path = external/neural_renderer
+	url = http://gitlab.alibaba-inc.com/rakesh.rs/neural_renderer.git
