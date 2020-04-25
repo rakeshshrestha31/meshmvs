@@ -217,10 +217,10 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:
                 logger.info("WARNING: Got non-finite loss %f" % loss)
                 skip = True
-            elif "depths" in model_outputs and "depths" in batch \
+            elif "pred_depths" in model_outputs and "depths" in batch \
                     and not model_kwargs.get("voxel_only", False):
                 depth_loss = adaptive_berhu_loss(
-                    batch["depths"], model_outputs["depths"],
+                    batch["depths"], model_outputs["pred_depths"],
                     batch["masks"]
                 )
                 loss = loss + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)

@@ -27,11 +27,10 @@ class MeshRefinementHead(nn.Module):
             )
             self.stages.append(stage)
 
-    def forward(self, img_feats, meshes, P=None, subdivide=False):
+    def forward(self, feats_extractor, meshes, P=None, subdivide=False):
         """
         Args:
-          img_feats (tensor): Tensor of shape (N, V, C, H, W) giving image features,
-                              or a list of such tensors.
+          feats_extractor (function): return features given current mesh
           meshes (Meshes): Meshes class of N meshes
           P (list): list Tensor of shape (N, 4, 4) giving projection matrix to be applied
                       to vertex positions before vert-align. If None, don't project verts.
@@ -40,16 +39,21 @@ class MeshRefinementHead(nn.Module):
         Returns:
           output_meshes (list of Meshes): A list with S Meshes, where S is the
                                           number of refinement stages
+          features (list of dicts): features returned by feats_extractor
+                                    for each mesh refinement stage
         """
         output_meshes = []
+        output_feats = []
         vert_feats = None
         for i, stage in enumerate(self.stages):
-            meshes, vert_feats = stage(img_feats, meshes, vert_feats, P)
+            feats = feats_extractor(meshes)
+            meshes, vert_feats = stage(feats["img_feats"], meshes, vert_feats, P)
             output_meshes.append(meshes)
+            output_feats.append(feats)
             if subdivide and i < self.num_stages - 1:
                 subdivide = SubdivideMeshes()
                 meshes, vert_feats = subdivide(meshes, feats=vert_feats)
-        return output_meshes
+        return output_meshes, output_feats
 
 
 class MeshRefinementStage(nn.Module):

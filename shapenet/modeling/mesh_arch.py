@@ -8,9 +8,11 @@ from pytorch3d.utils import ico_sphere
 
 import time
 import cv2
+import functools
 
 from shapenet.modeling.backbone import build_backbone, build_custom_backbone
-from shapenet.modeling.heads import MeshRefinementHead, VoxelHead, MVSNet
+from shapenet.modeling.heads import \
+        MeshRefinementHead, VoxelHead, MVSNet, DepthRenderer
 from shapenet.modeling.voxel_ops import \
         dummy_mesh, add_dummy_meshes, cubify, merge_multi_view_voxels, logit
 from shapenet.utils.coords import \
@@ -156,6 +158,8 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         VoxMeshMultiViewHead.setup(self, cfg)
 
         self.contrastive_depth_input = cfg.MODEL.CONTRASTIVE_DEPTH_INPUT
+        self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
+
         self.mvsnet = MVSNet(cfg.MODEL.MVSNET)
         if cfg.MODEL.RGB_FEATURES_INPUT:
             self.rgb_cnn, rgb_feat_dims \
@@ -178,12 +182,82 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
                 rgb_feat_dims[-1] + pre_voxel_depth_feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
+
+        # depth renderer
+        self.depth_renderer = DepthRenderer(cfg)
+
         # mesh head
         # times 3 cuz multi-view (mean, avg, std) features will be used
         # TODO: attention-based stuffs
         cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS \
                 = (sum(rgb_feat_dims) + sum(post_voxel_depth_feat_dims)) * 3
         self.mesh_head = MeshRefinementHead(cfg)
+
+    def extract_rgbd_features(
+        self, meshes, rgbd_feats, extrinsics
+    ):
+        """
+        returns rgbd features regardless of the meshes
+
+        Args:
+        - meshes (Meshes)
+        - rgbd_feats (tensor):
+            Tensor of shape (B, V, C, H, W) giving image features,
+            or a list of such tensors.
+        - extrinsics (list of tensors): list of (B, 4, 4) transformations
+        - img_shape (array like): 2D array of (H, W)
+        Returns:
+        - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                              or a list of such tensors.
+        - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+        return {
+            "img_feats": rgbd_feats,
+            "rendered_depths": rendered_depths
+        }
+
+    def extract_contrastive_features(
+        self, meshes, pred_depths, extrinsics
+    ):
+        """
+        contrastive depth feature extractor
+
+        Args:
+        - meshes (Meshes)
+        - pred_depths (tensor): shape (B, V, H, W)
+        - extrinsics (list of tensors): list of (B, 4, 4) transformations
+        Returns:
+        - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                              or a list of such tensors.
+        - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        batch_size, num_views = pred_depths.shape[:2]
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+        pred_depths = F.interpolate(
+            pred_depths, rendered_depths.shape[-2:], mode="nearest"
+        )
+        # (B, V, 2, H, W)
+        contrastive_input = torch.stack((pred_depths, rendered_depths), dim=2)
+        # flattened batch/views (BxV, 2, H, W)
+        contrastive_input = contrastive_input \
+                                .view(-1, *(contrastive_input.shape[2:]))
+        # list of (B*V, C, H, W)
+        feats = self.post_voxel_depth_cnn(contrastive_input)
+        # unflatten batch/views: (B, V, C, H, W)
+        feats = [
+            i.view(batch_size, num_views, *(i.shape[1:])) for  i in feats
+        ]
+        return {
+            "img_feats": feats,
+            "rendered_depths": rendered_depths
+        }
 
     def predict_depths(self, imgs, masks, extrinsics):
         """
@@ -239,6 +313,8 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             img_feats = []
 
         depths, depth_feats = self.predict_depths(imgs, masks, extrinsics)
+        masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
+        masked_depths = depths * masks_resized
 
         # merge RGB and depth features
         if img_feats:
@@ -268,33 +344,51 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         # separate views into list items
         voxel_scores = voxel_scores.unbind(1)
 
+        if self.contrastive_depth_input:
+            feats_extractor = functools.partial(
+                self.extract_contrastive_features, pred_depths=masked_depths,
+                extrinsics=rel_extrinsics
+            )
+        else:
+            feats_extractor = functools.partial(
+                self.extract_rgbd_features, rgbd_feats=rgbd_feats,
+                extrinsics=rel_extrinsics
+            )
+
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
-            dummy_refined = self.mesh_head(rgbd_feats, dummy_meshes, P)
+            dummy_refined, mesh_features = self.mesh_head(
+                feats_extractor, dummy_meshes, P
+            )
+            rendered_depths = [i["rendered_depths"] for i in mesh_features]
             return {
                 "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
-                "depths": depths
+                "pred_depths": depths, "rendered_depths": rendered_depths
             }
 
         cubified_meshes = cubify(
             merged_voxel_scores, self.voxel_size, self.cubify_threshold
         )
 
+        refined_meshes, mesh_features = self.mesh_head(
+            feats_extractor, cubified_meshes, P
+        )
+        rendered_depths = [i["rendered_depths"] for i in mesh_features]
+
         # debug only
         # timestamp = int(time.time() * 1000)
         # save_images(imgs, timestamp)
-        # masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
-        # save_depths(depths * masks_resized, timestamp)
+        # save_depths(masked_depths, timestamp)
         # save_depths(masks, str(timestamp)+"_mask")
-        # save_depths(rendered_depths, str(timestamp)+"_rendered")
+        # for i, rendered_depth in enumerate(rendered_depths):
+        #     save_depths(rendered_depth, "%d_rendered_%d" % (timestamp, i))
         # exit(0)
 
-        refined_meshes = self.mesh_head(rgbd_feats, cubified_meshes, P)
         return {
             "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
-            "depths": depths
+            "pred_depths": depths, "rendered_depths": rendered_depths
         }
 
 
