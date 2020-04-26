@@ -75,6 +75,7 @@ def get_shapenet_cfg():
     cfg.MODEL.MVSNET.PRINCIPAL_POINT = (111.5, 111.5)
     # loss weights
     cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT = 0.1
+    cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT = 0.001
 
     # ------------------------------------------------------------------------ #
     # Solver

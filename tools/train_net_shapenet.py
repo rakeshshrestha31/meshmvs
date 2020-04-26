@@ -7,6 +7,7 @@ import shutil
 import time
 import detectron2.utils.comm as comm
 import torch
+import torch.nn.functional as F
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from detectron2.utils.collect_env import collect_env_info
@@ -217,14 +218,42 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:
                 logger.info("WARNING: Got non-finite loss %f" % loss)
                 skip = True
-            elif "pred_depths" in model_outputs and "depths" in batch \
-                    and not model_kwargs.get("voxel_only", False):
-                depth_loss = adaptive_berhu_loss(
-                    batch["depths"], model_outputs["pred_depths"],
-                    batch["masks"]
-                )
-                loss = loss + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
-                losses["depth_loss"] = depth_loss
+            # depth losses
+            elif "depths" in batch:
+                if "pred_depths" in model_outputs:
+                    depth_loss = adaptive_berhu_loss(
+                        batch["depths"], model_outputs["pred_depths"],
+                        batch["masks"]
+                    )
+                    loss = loss \
+                         + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
+                    losses["pred_depth_loss"] = depth_loss
+                if "rendered_depths" in model_outputs \
+                        and not model_kwargs.get("voxel_only", False):
+                    pred_depths = model_outputs["pred_depths"]
+                    masks = batch["masks"]
+                    all_ones_masks = torch.ones_like(masks)
+                    resized_masks = F.interpolate(
+                        masks.view(-1, 1, *(masks.shape[2:])),
+                        pred_depths.shape[-2:], mode="nearest"
+                    ).view(*(masks.shape[:2]), *(pred_depths.shape[-2:]))
+                    masked_depths = pred_depths * resized_masks
+                    for i, rendered_depth in \
+                            enumerate(model_outputs["rendered_depths"]):
+                        rendered_depth_loss = adaptive_berhu_loss(
+                            masked_depths, rendered_depth, all_ones_masks
+                        )
+                        loss = loss + (rendered_depth_loss \
+                                       * cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT)
+                        losses["rendered_depth_loss_%d" % i] \
+                                = rendered_depth_loss
+
+                        # rendered vs GT depth loss, only for debug
+                        rendered_gt_depth_loss = adaptive_berhu_loss(
+                            batch["depths"], rendered_depth, all_ones_masks
+                        )
+                        losses["rendered_gt_depth_loss_%d" % i] \
+                                = rendered_gt_depth_loss
 
             if model_kwargs.get("voxel_only", False):
                 for k, v in losses.items():
