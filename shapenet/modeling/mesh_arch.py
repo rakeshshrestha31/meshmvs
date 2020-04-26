@@ -501,7 +501,7 @@ def save_depths(depths, file_prefix):
     """
     for batch_idx in range(depths.shape[0]):
         for view_idx in range(depths.shape[1]):
-            depth = depths[batch_idx, view_idx] * 255
+            depth = depths[batch_idx, view_idx] / 2.5 * 255
             depth = depth.type(torch.uint8).cpu().detach().numpy()
             filename = "/tmp/depth_{}_{}_{}.png" \
                             .format(file_prefix, batch_idx, view_idx)
