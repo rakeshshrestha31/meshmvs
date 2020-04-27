@@ -12,7 +12,8 @@ import functools
 
 from shapenet.modeling.backbone import build_backbone, build_custom_backbone
 from shapenet.modeling.heads import \
-        MeshRefinementHead, VoxelHead, MVSNet, DepthRenderer
+        MeshRefinementHead, VoxelHead, MVSNet, DepthRenderer, \
+        MultiHeadAttentionFeaturePooling, SimpleAttentionFeaturePooling
 from shapenet.modeling.voxel_ops import \
         dummy_mesh, add_dummy_meshes, cubify, merge_multi_view_voxels, logit
 from shapenet.utils.coords import \
@@ -69,7 +70,9 @@ class VoxMeshHead(nn.Module):
 
         if voxel_only:
             dummy_meshes = dummy_mesh(N, device)
-            dummy_refined, _ = self.mesh_head(feats_extractor, dummy_meshes, P)
+            dummy_refined, _, _ = self.mesh_head(
+                feats_extractor, dummy_meshes, P
+            )
             return {
                 "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
             }
@@ -77,7 +80,9 @@ class VoxMeshHead(nn.Module):
         cubified_meshes = cubify(
             voxel_scores[0], self.voxel_size, self.cubify_threshold
         )
-        refined_meshes, _ = self.mesh_head(feats_extractor, cubified_meshes, P)
+        refined_meshes, _, _ = self.mesh_head(
+            feats_extractor, cubified_meshes, P
+        )
         return {
             "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
         }
@@ -94,14 +99,116 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
+
+        # multi-view feature fusion
+        prefusion_feat_dims = sum(feat_dims)
+        postfusion_feat_dims = self.init_feature_fusion(
+            cfg, prefusion_feat_dims
+        )
+
         # mesh head
         # times 3 cuz multi-view (mean, avg, std) features will be used
-        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = sum(feat_dims) * 3
-        self.mesh_head = MeshRefinementHead(cfg)
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
+        self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
 
     def setup(self, cfg):
         VoxMeshHead.setup(self, cfg)
         self.cubify_threshold_logit = logit(self.cubify_threshold)
+
+    @staticmethod
+    def extract_feature_stats(features):
+        """
+        Extract feature statistics (max, mean, std) from multi-view features
+
+        Args:
+        - vert_aligned_feats: tensors of shape (V, N, C)
+
+        Returns:
+        - feature stats: tensor of shape (N, C*3)
+        - weights: tensor of shape (N, V, 1)
+        """
+        max_features = torch.max(features, dim=0)[0]
+        mean_features = torch.mean(features, dim=0)
+        var_features = torch.var(features, dim=0, unbiased=False)
+        # calculating std using torch methods give NaN gradients
+        # var will have different unit that mean/max, hence std desired
+        std_features = torch.sqrt(var_features + 1e-8)
+        stats_features = torch.cat(
+            (max_features, mean_features, std_features), dim=-1
+        )
+
+        # dummy weights (all views have the same weights)
+        num_views, num_points = features.shape[:2]
+        weights = torch.ones(
+            (num_points, num_views, 1),
+            dtype=features.dtype, device=features.device
+        ) / num_views
+        return stats_features, weights
+
+    def init_feature_fusion(self, cfg, prefusion_feat_dims):
+        """
+        Returns:
+        - feature dimensions after fusion
+        """
+        if cfg.MODEL.FEATURE_FUSION_METHOD == "multihead_attention":
+            return self.init_multihead_attention(cfg, prefusion_feat_dims)
+        elif cfg.MODEL.FEATURE_FUSION_METHOD == "simple_attention":
+            return self.init_simple_attention(cfg, prefusion_feat_dims)
+        elif cfg.MODEL.FEATURE_FUSION_METHOD == "stats":
+            return self.init_stats_fusion(cfg, prefusion_feat_dims)
+        else:
+            raise ValueError(
+                "Unsupported feature fusion method %s" \
+                    % cfg.MODEL.FEATURE_FUSION_METHOD
+            )
+
+    def init_multihead_attention(self, cfg, prefusion_feat_dims):
+        if cfg.MODEL.MULTIHEAD_ATTENTION.FEATURE_DIMS <= 0:
+            postfusion_feat_dims = prefusion_feat_dims
+        else:
+            postfusion_feat_dims = cfg.MODEL.MULTIHEAD_ATTENTION.FEATURE_DIMS
+
+        self.feature_fusion_head = MultiHeadAttentionFeaturePooling(
+            prefusion_feat_dims, postfusion_feat_dims,
+            num_heads = cfg.MODEL.MULTIHEAD_ATTENTION.NUM_HEADS,
+            use_stats_query=False
+        )
+        return postfusion_feat_dims
+
+    def init_simple_attention(self, cfg, prefusion_feat_dims):
+        self.feature_fusion_head = \
+                SimpleAttentionFeaturePooling(prefusion_feat_dims)
+        # features size doesn't change cuz its weighted sum
+        return prefusion_feat_dims
+
+    def init_stats_fusion(self, cfg, prefusion_feat_dims):
+        self.feature_fusion_head = self.extract_feature_stats
+        # *3 for max, mean and std features
+        return prefusion_feat_dims * 3
+
+    def fuse_multiview_features(self, features):
+        """
+        Args:
+        - features: list of tensors of shape (B, N, C_in). List len = num_views
+        Returns:
+        - fused feature: tensor of shape (B, N, C_out)
+        - weights: tensor of shape (B, N, V, 1)
+        """
+        # shape (B, V, N, C_in)
+        joint_features = torch.stack(features, dim=1)
+        fused_features = []
+        fusion_weights = []
+        # each batch needs to be treated separately
+        # as they'll have different view weights for attention method
+        # this doesn't matter for stats fusion, but let's keep it uniform
+        for batch_features in joint_features.unbind(0):
+            feats, weights = self.feature_fusion_head(batch_features)
+            fused_features.append(feats)
+            fusion_weights.append(weights)
+
+        fused_features = torch.stack(fused_features, dim=0)
+        fusion_weights = torch.stack(fusion_weights, dim=0)
+        return fused_features, fusion_weights
 
     def forward(self, imgs, intrinsics, extrinsics, voxel_only=False):
         """
@@ -146,19 +253,25 @@ class VoxMeshMultiViewHead(VoxMeshHead):
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
-            dummy_refined, _ = self.mesh_head(feats_extractor, dummy_meshes, P)
+            dummy_refined, _, view_weights = self.mesh_head(
+                feats_extractor, dummy_meshes, P
+            )
             return {
                 "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
+                "view_weights": view_weights
             }
 
         cubified_meshes = cubify(
             merged_voxel_scores, self.voxel_size, self.cubify_threshold
         )
-        refined_meshes, _ = self.mesh_head(feats_extractor, cubified_meshes, P)
+        refined_meshes, _, view_weights = self.mesh_head(
+            feats_extractor, cubified_meshes, P
+        )
         return {
             "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
+            "view_weights": view_weights
         }
 
 
@@ -197,12 +310,18 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         # depth renderer
         self.depth_renderer = DepthRenderer(cfg)
 
+        # multi-view feature fusion
+        prefusion_feat_dims = sum(rgb_feat_dims) \
+                            + sum(post_voxel_depth_feat_dims)
+        postfusion_feat_dims = self.init_feature_fusion(
+            cfg, prefusion_feat_dims
+        )
+
         # mesh head
         # times 3 cuz multi-view (mean, avg, std) features will be used
         # TODO: attention-based stuffs
-        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS \
-                = (sum(rgb_feat_dims) + sum(post_voxel_depth_feat_dims)) * 3
-        self.mesh_head = MeshRefinementHead(cfg)
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
+        self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
 
     def extract_rgbd_features(
         self, meshes, rgbd_feats, extrinsics
@@ -368,21 +487,22 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
-            dummy_refined, mesh_features = self.mesh_head(
+            dummy_refined, mesh_features, view_weights = self.mesh_head(
                 feats_extractor, dummy_meshes, P
             )
             rendered_depths = [i["rendered_depths"] for i in mesh_features]
             return {
                 "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
-                "pred_depths": depths, "rendered_depths": rendered_depths
+                "pred_depths": depths, "rendered_depths": rendered_depths,
+                "view_weights": view_weights
             }
 
         cubified_meshes = cubify(
             merged_voxel_scores, self.voxel_size, self.cubify_threshold
         )
 
-        refined_meshes, mesh_features = self.mesh_head(
+        refined_meshes, mesh_features, view_weights = self.mesh_head(
             feats_extractor, cubified_meshes, P
         )
         rendered_depths = [i["rendered_depths"] for i in mesh_features]
@@ -399,7 +519,8 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         return {
             "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
-            "pred_depths": depths, "rendered_depths": rendered_depths
+            "pred_depths": depths, "rendered_depths": rendered_depths,
+            "view_weights": view_weights
         }
 
 

@@ -8,7 +8,7 @@ from shapenet.utils.coords import project_verts
 
 
 class MeshRefinementHead(nn.Module):
-    def __init__(self, cfg):
+    def __init__(self, cfg, multiview_fusion_callback=None):
         super(MeshRefinementHead, self).__init__()
 
         # fmt: off
@@ -23,14 +23,17 @@ class MeshRefinementHead(nn.Module):
         for i in range(self.num_stages):
             vert_feat_dim = 0 if i == 0 else hidden_dim
             stage = MeshRefinementStage(
-                input_channels, vert_feat_dim, hidden_dim, stage_depth, gconv_init=graph_conv_init
+                input_channels, vert_feat_dim, hidden_dim, stage_depth,
+                gconv_init=graph_conv_init,
+                multiview_fusion_callback=multiview_fusion_callback
             )
             self.stages.append(stage)
 
     def forward(self, feats_extractor, meshes, P=None, subdivide=False):
         """
         Args:
-          feats_extractor (function): return features given current mesh
+          feats_extractor (function): return features given current mesh,
+                                      list of Tensor of shape (B, V, C, H, W)
           meshes (Meshes): Meshes class of N meshes
           P (list): list Tensor of shape (N, 4, 4) giving projection matrix to be applied
                       to vertex positions before vert-align. If None, don't project verts.
@@ -44,20 +47,27 @@ class MeshRefinementHead(nn.Module):
         """
         output_meshes = []
         output_feats = []
+        output_feats_weights = []
         vert_feats = None
         for i, stage in enumerate(self.stages):
             feats = feats_extractor(meshes)
-            meshes, vert_feats = stage(feats["img_feats"], meshes, vert_feats, P)
+            meshes, vert_feats, view_weights = stage(
+                feats["img_feats"], meshes, vert_feats, P
+            )
             output_meshes.append(meshes)
             output_feats.append(feats)
+            output_feats_weights.append(view_weights)
             if subdivide and i < self.num_stages - 1:
                 subdivide = SubdivideMeshes()
                 meshes, vert_feats = subdivide(meshes, feats=vert_feats)
-        return output_meshes, output_feats
+        return output_meshes, output_feats, output_feats_weights
 
 
 class MeshRefinementStage(nn.Module):
-    def __init__(self, img_feat_dim, vert_feat_dim, hidden_dim, stage_depth, gconv_init="normal"):
+    def __init__(
+        self, img_feat_dim, vert_feat_dim, hidden_dim, stage_depth,
+        gconv_init="normal", multiview_fusion_callback=None
+    ):
         """
         Args:
           img_feat_dim (int): Dimension of features we will get from vert_align
@@ -74,6 +84,8 @@ class MeshRefinementStage(nn.Module):
         self.vert_offset = nn.Linear(hidden_dim + 3, 3)
 
         self.gconvs = nn.ModuleList()
+
+        self.multiview_fusion_callback = multiview_fusion_callback
         for i in range(stage_depth):
             if i == 0:
                 input_dim = hidden_dim + vert_feat_dim + 3
@@ -130,7 +142,9 @@ class MeshRefinementStage(nn.Module):
                       .view(1, 1, 1, 3)
         vert_pos_padded = vert_pos_padded * factor
         # Get features from the image
-        vert_align_feats = multi_view_vert_align(img_feats, vert_pos_padded)
+        vert_align_feats, view_weights = multiview_vert_align(
+            img_feats, vert_pos_padded, self.multiview_fusion_callback
+        )
         vert_align_feats = _padded_to_packed(
             vert_align_feats, verts_padded_to_packed_idx
         )
@@ -154,10 +168,10 @@ class MeshRefinementStage(nn.Module):
         vert_offsets = torch.tanh(self.vert_offset(vert_feats))
         meshes_out = meshes.offset_verts(vert_offsets)
 
-        return meshes_out, vert_feats_nopos
+        return meshes_out, vert_feats_nopos, view_weights
 
 
-def multi_view_vert_align(img_feats, vert_pos_padded):
+def multiview_vert_align(img_feats, vert_pos_padded, feat_fusion_callback=None):
     """
     Extract multi-view features corresponding to mesh vertices
     from image features
@@ -179,29 +193,11 @@ def multi_view_vert_align(img_feats, vert_pos_padded):
 
     if len(vert_aligned_feats) == 1:
         # single view, just return the features
-        return vert_aligned_feats[0]
+        return vert_aligned_feats[0], None
     else:
-        return extract_features_stats(vert_aligned_feats)
-
-
-def extract_features_stats(features):
-    """
-    Extract feature statistics (max, mean, std) from a list of features
-
-    Args:
-    - vert_aligned_feats: list of tensors of shape (B, N, C)
-
-    Returns:
-    - tensor of shape (B, N, C*3)
-    """
-    joint_features = torch.stack(features, dim=-1)
-    max_features = torch.max(joint_features, dim=-1)[0]
-    mean_features = torch.mean(joint_features, dim=-1)
-    var_features = torch.var(joint_features, dim=-1, unbiased=False)
-    # calculating std using torch methods give NaN gradients
-    # var will have different unit that mean/max, hence std desired
-    std_features = torch.sqrt(var_features + 1e-8)
-    return torch.cat((max_features, mean_features, std_features), dim=-1)
+        if feat_fusion_callback is None:
+            raise ValueError("feat_fusion_callback None with multi-view features")
+        return feat_fusion_callback(vert_aligned_feats)
 
 
 def _padded_to_packed(x, idx):
