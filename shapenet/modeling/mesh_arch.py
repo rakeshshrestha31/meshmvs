@@ -48,6 +48,11 @@ class VoxMeshHead(nn.Module):
     def _get_projection_matrix(self, N, device):
         return self.K[None].repeat(N, 1, 1).to(device).detach()
 
+    @staticmethod
+    def extract_img_features(meshes, img_feats):
+        """returns img features regardless of the meshes"""
+        return {"img_feats": img_feats}
+
     def forward(self, imgs, voxel_only=False):
         N = imgs.shape[0]
         device = imgs.device
@@ -58,20 +63,23 @@ class VoxMeshHead(nn.Module):
         # add view dimension (single view)
         img_feats = [i.unsqueeze(1) for i in img_feats]
         P = [self._get_projection_matrix(N, device)]
+        feats_extractor = functools.partial(
+            self.extract_img_features, img_feats=img_feats
+        )
 
         if voxel_only:
             dummy_meshes = dummy_mesh(N, device)
-            dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
+            dummy_refined, _ = self.mesh_head(feats_extractor, dummy_meshes, P)
             return {
-                "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
+                "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
             }
 
         cubified_meshes = cubify(
             voxel_scores[0], self.voxel_size, self.cubify_threshold
         )
-        refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
+        refined_meshes, _ = self.mesh_head(feats_extractor, cubified_meshes, P)
         return {
-            "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
+            "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
         }
 
 
@@ -117,6 +125,9 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         img_feats = [
             i.view(batch_size, num_views, *(i.shape[1:])) for i in img_feats
         ]
+        feats_extractor = functools.partial(
+            self.extract_img_features, img_feats=img_feats
+        )
 
         # debug only
         # timestamp = int(time.time() * 1000)
@@ -135,18 +146,18 @@ class VoxMeshMultiViewHead(VoxMeshHead):
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
-            dummy_refined = self.mesh_head(img_feats, dummy_meshes, P)
+            dummy_refined, _ = self.mesh_head(feats_extractor, dummy_meshes, P)
             return {
-                "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
+                "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
             }
 
         cubified_meshes = cubify(
             merged_voxel_scores, self.voxel_size, self.cubify_threshold
         )
-        refined_meshes = self.mesh_head(img_feats, cubified_meshes, P)
+        refined_meshes, _ = self.mesh_head(feats_extractor, cubified_meshes, P)
         return {
-            "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
+            "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
         }
 
