@@ -5,6 +5,9 @@ import logging
 import os
 import shutil
 import time
+import numpy as np
+import tqdm
+
 import detectron2.utils.comm as comm
 import torch
 import torch.nn.functional as F
@@ -13,6 +16,8 @@ import torch.multiprocessing as mp
 from detectron2.utils.collect_env import collect_env_info
 from detectron2.utils.logger import setup_logger
 from fvcore.common.file_io import PathManager
+from pytorch3d.ops import sample_points_from_meshes
+from pytorch3d.io import save_obj
 
 from shapenet.config import get_shapenet_cfg
 from shapenet.data import build_data_loader, register_shapenet
@@ -24,8 +29,12 @@ from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
+from meshrcnn.utils.metrics import compare_meshes
 
 logger = logging.getLogger("shapenet")
+P2M_SCALE = 0.57
+NUM_PRED_SURFACE_SAMPLES = 6466
+NUM_GT_SURFACE_SAMPLES = 6466
 
 
 def copy_data(args):
@@ -77,6 +86,12 @@ def main_worker_eval(worker_id, args):
     model.load_state_dict(state_dict)
     logger.info("Model loaded")
     model.to(device)
+
+    prediction_dir = os.path.join(
+        cfg.OUTPUT_DIR, "predictions", "eval", "predict", "0"
+    )
+    save_predictions(model, test_loader, prediction_dir)
+    exit(0)
 
     if args.eval_p2m:
         evaluate_test_p2m(model, test_loader)
@@ -383,6 +398,76 @@ def eval_and_save(model, loaders, optimizer, scheduler, cp):
     # make all processes wait
     if comm.get_world_size() > 1:
         dist.barrier()
+
+
+@torch.no_grad()
+def save_predictions(model, loader, output_dir):
+    """
+    This function is used save predicted and gt meshes
+    """
+    # Note that all eval runs on main process
+    assert comm.is_main_process()
+    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+        model = model.module
+
+    device = torch.device("cuda:0")
+    os.makedirs(output_dir, exist_ok=True)
+
+    for batch in tqdm.tqdm(loader):
+        batch = loader.postprocess(batch, device)
+        model_kwargs = {}
+        module = model.module if hasattr(model, "module") else model
+        if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+            model_kwargs["intrinsics"] = batch["intrinsics"]
+            model_kwargs["extrinsics"] = batch["extrinsics"]
+        if type(module) == VoxMeshDepthHead:
+            model_kwargs["masks"] = batch["masks"]
+        model_outputs = model(batch["imgs"], **model_kwargs)
+
+        pred_mesh = model_outputs["meshes_pred"][-1]
+        gt_mesh = batch["meshes"]
+        pred_mesh = pred_mesh.scale_verts(P2M_SCALE)
+        gt_mesh = gt_mesh.scale_verts(P2M_SCALE)
+
+        pred_points = sample_points_from_meshes(
+            pred_mesh, NUM_PRED_SURFACE_SAMPLES, return_normals=False
+        )
+        gt_points = sample_points_from_meshes(
+            gt_mesh, NUM_GT_SURFACE_SAMPLES, return_normals=False
+        )
+
+        pred_points = pred_points.cpu().detach().numpy()
+        gt_points = gt_points.cpu().detach().numpy()
+
+        batch_size = pred_points.shape[0]
+        for batch_idx in range(batch_size):
+            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            pred_filename = os.path.join(
+                output_dir, "{}_{}_predict.xyz".format(label, label_appendix)
+            )
+            gt_filename = os.path.join(
+                output_dir, "{}_{}_ground.xyz".format(label, label_appendix)
+            )
+
+            np.savetxt(pred_filename, pred_points[batch_idx])
+            np.savetxt(gt_filename, gt_points[batch_idx])
+
+            # pred_filename = pred_filename.replace(".xyz", ".obj")
+            # gt_filename = gt_filename.replace(".xyz", ".obj")
+
+            # pred_verts, pred_faces = pred_mesh[batch_idx] \
+            #                             .get_mesh_verts_faces(0)
+            # gt_verts, gt_faces = gt_mesh[batch_idx] \
+            #                         .get_mesh_verts_faces(0)
+            # save_obj(pred_filename, pred_verts, pred_faces)
+            # save_obj(gt_filename, gt_verts, gt_faces)
+
+            # metrics = compare_meshes(
+            #     pred_mesh[batch_idx], gt_mesh[batch_idx],
+            #     num_samples=NUM_GT_SURFACE_SAMPLES, scale=1.0,
+            #     thresholds=[0.01, 0.014142], reduce=True
+            # )
+            # print("%s_%s: %r" % (label, label_appendix, metrics))
 
 
 def setup_loaders(cfg):
