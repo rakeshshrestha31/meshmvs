@@ -323,6 +323,13 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
         self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
 
+        print({
+            "rgb_feat_dims": rgb_feat_dims,
+            "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
+            "prefusion_feat_dims": prefusion_feat_dims,
+            "postfusion_feat_dims": postfusion_feat_dims
+        })
+
     def extract_rgbd_features(
         self, meshes, rgbd_feats, extrinsics
     ):
@@ -481,11 +488,12 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         if self.contrastive_depth_input:
             def feats_extractor(*args, **kwargs):
                 nonlocal masked_depths, rel_extrinsics
-                contrastive_feats = self.extract_contrastive_features(
+                feats = self.extract_contrastive_features(
                     *args, **kwargs,
                     pred_depths=masked_depths, extrinsics=rel_extrinsics,
                 )
-                return contrastive_feats + img_feats
+                feats["img_feats"] += img_feats
+                return feats
             # add image features
         else:
             feats_extractor = functools.partial(
