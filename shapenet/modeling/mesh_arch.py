@@ -462,6 +462,10 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         rgbd_feats = [
             i.view(batch_size, num_views, *(i.shape[1:])) for i in rgbd_feats
         ]
+        if img_feats:
+            img_feats = [
+                i.view(batch_size, num_views, *(i.shape[1:])) for i in img_feats
+            ]
 
         K = self._get_projection_matrix(batch_size, device)
         rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
@@ -475,10 +479,14 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         voxel_scores = voxel_scores.unbind(1)
 
         if self.contrastive_depth_input:
-            feats_extractor = functools.partial(
-                self.extract_contrastive_features, pred_depths=masked_depths,
-                extrinsics=rel_extrinsics
-            )
+            def feats_extractor(*args, **kwargs):
+                nonlocal masked_depths, rel_extrinsics
+                contrastive_feats = self.extract_contrastive_features(
+                    *args, **kwargs,
+                    pred_depths=masked_depths, extrinsics=rel_extrinsics,
+                )
+                return contrastive_feats + img_feats
+            # add image features
         else:
             feats_extractor = functools.partial(
                 self.extract_rgbd_features, rgbd_feats=rgbd_feats,
