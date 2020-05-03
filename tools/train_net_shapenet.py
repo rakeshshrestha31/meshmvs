@@ -424,6 +424,9 @@ def save_predictions(model, loader, output_dir):
             model_kwargs["masks"] = batch["masks"]
         model_outputs = model(batch["imgs"], **model_kwargs)
 
+        # TODO: debug only
+        # save_debug_predictions(batch, model_outputs)
+
         pred_mesh = model_outputs["meshes_pred"][-1]
         gt_mesh = batch["meshes"]
         pred_mesh = pred_mesh.scale_verts(P2M_SCALE)
@@ -468,6 +471,64 @@ def save_predictions(model, loader, output_dir):
             #     thresholds=[0.01, 0.014142], reduce=True
             # )
             # print("%s_%s: %r" % (label, label_appendix, metrics))
+
+
+def save_debug_predictions(batch, model_outputs):
+    """
+    save voxels and depths
+    """
+    from shapenet.modeling.voxel_ops import cubify
+    from shapenet.modeling.mesh_arch import save_depths
+
+    batch_size = len(batch["id_strs"])
+    for view_idx, voxels in enumerate(model_outputs["voxel_scores"]):
+        cubified = cubify(voxels, 48, 0.2)
+        for batch_idx in range(batch_size):
+            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            save_obj(
+                "/tmp/{}_{}_{}_multiview_vox.obj".format(
+                    label, label_appendix, view_idx
+                ),
+                cubified[batch_idx].verts_packed(),
+                cubified[batch_idx].faces_packed()
+            )
+    merged_voxels = cubify(model_outputs["merged_voxel_scores"], 48, 0.2)
+    for batch_idx in range(batch_size):
+        label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+        save_obj(
+            "/tmp/{}_{}_merged_vox.obj".format(
+                label, label_appendix
+            ),
+            merged_voxels[batch_idx].verts_packed(),
+            merged_voxels[batch_idx].faces_packed()
+        )
+
+    for stage_idx, pred_mesh in enumerate(model_outputs["meshes_pred"]):
+        for batch_idx in range(batch_size):
+            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            save_obj("/tmp/{}_{}_{}_pred_mesh.obj".format(
+                label, label_appendix, stage_idx
+            ), pred_mesh[0].verts_packed(), pred_mesh[0].faces_packed())
+
+    if "pred_depths" in model_outputs:
+        masks = F.interpolate(
+            batch["masks"], model_outputs["pred_depths"].shape[-2:],
+            mode="nearest"
+        )
+        # TODO: the labels won't be corrent when batch size > 1. Fix it
+        save_depths(
+            model_outputs["pred_depths"] * masks,
+            "pred_{}_{}".format(label, label_appendix), (137, 137)
+        )
+
+    if "rendered_depths" in model_outputs:
+        # TODO: the labels won't be corrent when batch size > 1. Fix it
+        for stage_idx, depth in enumerate(model_outputs["rendered_depths"]):
+            save_depths(
+                depth,
+                "rendered_{}_{}_{}".format(label, label_appendix, stage_idx),
+                (137, 137)
+            )
 
 
 def setup_loaders(cfg):
