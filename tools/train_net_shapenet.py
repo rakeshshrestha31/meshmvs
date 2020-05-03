@@ -29,6 +29,7 @@ from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
+from shapenet.utils.depth_backprojection import get_points_from_depths
 from meshrcnn.utils.metrics import compare_meshes
 
 logger = logging.getLogger("shapenet")
@@ -473,6 +474,7 @@ def save_predictions(model, loader, output_dir):
             # print("%s_%s: %r" % (label, label_appendix, metrics))
 
 
+@torch.no_grad()
 def save_debug_predictions(batch, model_outputs):
     """
     save voxels and depths
@@ -515,11 +517,13 @@ def save_debug_predictions(batch, model_outputs):
             batch["masks"], model_outputs["pred_depths"].shape[-2:],
             mode="nearest"
         )
+        masked_depths = model_outputs["pred_depths"] * masks
         # TODO: the labels won't be corrent when batch size > 1. Fix it
         save_depths(
-            model_outputs["pred_depths"] * masks,
+            masked_depths,
             "pred_{}_{}".format(label, label_appendix), (137, 137)
         )
+        save_backproj_depths(masked_depths, batch["id_strs"], "depth_cloud")
 
     if "rendered_depths" in model_outputs:
         # TODO: the labels won't be corrent when batch size > 1. Fix it
@@ -529,6 +533,31 @@ def save_debug_predictions(batch, model_outputs):
                 "rendered_{}_{}_{}".format(label, label_appendix, stage_idx),
                 (137, 137)
             )
+            save_backproj_depths(
+                depth, batch["id_strs"], "rendered_cloud_{}".format(stage_idx)
+            )
+
+
+@torch.no_grad()
+def save_backproj_depths(depths, id_strs, prefix):
+    depths = F.interpolate(depths, (224, 224))
+    dtype = depths.dtype
+    device = depths.device
+    intrinsics = torch.tensor([
+        [248.0, 0.0, 111.5], [0.0, 248.0, 111.5], [0.0, 0.0, 1.0]
+    ], dtype=dtype, device=device)
+    depth_points = get_points_from_depths(depths, intrinsics)
+
+    import open3d as o3d
+    for batch_idx in range(len(depth_points)):
+        label, label_appendix = id_strs[batch_idx].split("-")[:2]
+        for view_idx in range(len(depth_points[batch_idx])):
+            points = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                depth_points[batch_idx][view_idx].detach().cpu().numpy()
+            ))
+            o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}.ply".format(
+                prefix, label, label_appendix, view_idx
+            ), points)
 
 
 def setup_loaders(cfg):
