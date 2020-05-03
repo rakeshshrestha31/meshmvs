@@ -641,12 +641,17 @@ def save_images(imgs, file_prefix):
 
 
 @torch.no_grad()
-def save_depths(depths, file_prefix):
+def save_depths(depths, file_prefix, size=None):
     """
     Args:
     - depths: tensor of shape (B, V, H, W)
     - file_prefix: prefix to use in the filename to distinguish batches
+    - size: size to the depth image to resize to (optional)
     """
+    if size is not None:
+        depths = F.interpolate(
+            depths.view(-1, 1, *(depths.shape[-2:])), size, mode='nearest'
+        ).view(*(depths.shape[:2]), *size)
     for batch_idx in range(depths.shape[0]):
         for view_idx in range(depths.shape[1]):
             depth = depths[batch_idx, view_idx] / 2.5 * 255
