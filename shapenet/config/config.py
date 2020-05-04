@@ -44,6 +44,8 @@ def get_shapenet_cfg():
     cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH = 0.0
     # voxel only iterations
     cfg.MODEL.VOXEL_HEAD.VOXEL_ONLY_ITERS = 100
+    # Whether voxel weights are frozen
+    cfg.MODEL.VOXEL_HEAD.FREEZE = False
 
     # ------------------------------------------------------------------------ #
     # Mesh Head

@@ -159,6 +159,13 @@ def main_worker(worker_id, args):
         optimizer.load_state_dict(cp.latest_states["optim"])
         scheduler.load_state_dict(cp.latest_states["lr_scheduler"])
 
+    if cfg.MODEL.VOXEL_HEAD.FREEZE:
+        # freeze voxel head weights
+        logger.info("freezing voxel head weights")
+        module = model.module if hasattr(model, "module") else model
+        for param in module.voxel_head.parameters():
+            param.required_grad = False
+
     training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn)
 
 
