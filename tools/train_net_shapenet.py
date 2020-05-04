@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import open3d as o3d
 import logging
 import os
 import shutil
@@ -508,9 +509,20 @@ def save_debug_predictions(batch, model_outputs):
     for stage_idx, pred_mesh in enumerate(model_outputs["meshes_pred"]):
         for batch_idx in range(batch_size):
             label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            view_weights = model_outputs["view_weights"][stage_idx][batch_idx]
+            view_weights = F.normalize(view_weights, dim=-1).squeeze(1)
             save_obj("/tmp/{}_{}_{}_pred_mesh.obj".format(
                 label, label_appendix, stage_idx
             ), pred_mesh[0].verts_packed(), pred_mesh[0].faces_packed())
+            point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                pred_mesh[0].verts_packed().cpu().numpy()
+            ))
+            point_cloud.colors = o3d.utility.Vector3dVector(
+                view_weights.detach().cpu().numpy()
+            )
+            o3d.io.write_point_cloud("/tmp/{}_{}_{}_pred_cloud.ply".format(
+                label, label_appendix, stage_idx
+            ), point_cloud)
 
     if "pred_depths" in model_outputs:
         masks = F.interpolate(
@@ -548,7 +560,6 @@ def save_backproj_depths(depths, id_strs, prefix):
     ], dtype=dtype, device=device)
     depth_points = get_points_from_depths(depths, intrinsics)
 
-    import open3d as o3d
     for batch_idx in range(len(depth_points)):
         label, label_appendix = id_strs[batch_idx].split("-")[:2]
         for view_idx in range(len(depth_points[batch_idx])):
