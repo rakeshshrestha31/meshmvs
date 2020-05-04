@@ -351,10 +351,11 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 logger.info(msg % num_infinite_grad)
             cp.step()
 
-            if cp.t % cfg.SOLVER.CHECKPOINT_PERIOD == 0:
-                eval_and_save(model, loaders, optimizer, scheduler, cp)
         cp.step_epoch()
-    eval_and_save(model, loaders, optimizer, scheduler, cp)
+        eval_and_save(
+            model, loaders, optimizer, scheduler, cp,
+            cfg.SOLVER.EARLY_STOP_METRIC
+        )
 
     if comm.is_main_process():
         logger.info("Evaluating on test set:")
@@ -364,7 +365,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
         evaluate_test(model, test_loader)
 
 
-def eval_and_save(model, loaders, optimizer, scheduler, cp):
+def eval_and_save(
+    model, loaders, optimizer, scheduler, cp, early_stop_metric
+):
     # NOTE(gkioxari) For now only do evaluation on the main process
     if comm.is_main_process():
         logger.info("Evaluating on training set:")
@@ -396,7 +399,7 @@ def eval_and_save(model, loaders, optimizer, scheduler, cp):
         """
         cp.store_metric(**train_metrics)
         cp.store_metric(**test_metrics)
-        cp.early_stop_metric = eval_split + "_F1@0.300000"
+        cp.early_stop_metric = eval_split + "_" + early_stop_metric
 
         cp.store_state("model", model.state_dict())
         cp.store_state("optim", optimizer.state_dict())
