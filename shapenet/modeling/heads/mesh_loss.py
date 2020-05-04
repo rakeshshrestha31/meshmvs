@@ -59,21 +59,11 @@ class MeshLoss(nn.Module):
         total_loss = torch.tensor(0.0).to(points_gt)
         losses = {}
 
-        losses["voxel"] = torch.tensor(0.0).to(points_gt)
         if voxel_scores is not None and voxels_gt is not None and self.voxel_weight > 0:
-            voxels_gt = voxels_gt.float()
-            if merged_voxel_scores is not None:
-                # repeat view 0 for merged voxels
-                voxels_gt = torch.cat((voxels_gt[:, 0:1], voxels_gt), dim=1)
-                voxel_scores = [merged_voxel_scores, *voxel_scores]
-            for voxel_idx, voxel_score in enumerate(voxel_scores):
-                voxel_loss = F.binary_cross_entropy_with_logits(
-                    voxel_score, voxels_gt[:, voxel_idx]
-                )
-                losses["voxel"] = losses["voxel"] + voxel_loss
-                losses["voxel_%d" % voxel_idx] = voxel_loss
-            # take average to be invariant to number of views
-            losses["voxel"] = losses["voxel"] / len(voxel_scores)
+            voxel_losses = self.voxel_loss(
+                voxel_scores, merged_voxel_scores, voxels_gt
+            )
+            losses = {**losses, **voxel_losses}
             total_loss = total_loss + self.voxel_weight * losses["voxel"]
 
         if isinstance(meshes_pred, Meshes):
@@ -133,3 +123,23 @@ class MeshLoss(nn.Module):
         losses["edge"] = edge_loss
 
         return total_loss, losses
+
+    @staticmethod
+    def voxel_loss(voxel_scores, merged_voxel_scores, voxels_gt):
+        losses = {}
+        losses["voxel"] = torch.tensor(0.0).to(voxels_gt)
+        voxels_gt = voxels_gt.float()
+        if merged_voxel_scores is not None:
+            # repeat view 0 for merged voxels
+            voxels_gt = torch.cat((voxels_gt[:, 0:1], voxels_gt), dim=1)
+            voxel_scores = [merged_voxel_scores, *voxel_scores]
+
+        for voxel_idx, voxel_score in enumerate(voxel_scores):
+            voxel_loss = F.binary_cross_entropy_with_logits(
+                voxel_score, voxels_gt[:, voxel_idx]
+            )
+            losses["voxel"] = losses["voxel"] + voxel_loss
+            losses["voxel_%d" % voxel_idx] = voxel_loss
+        # take average to be invariant to number of views
+        losses["voxel"] = losses["voxel"] / len(voxel_scores)
+        return losses
