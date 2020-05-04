@@ -262,21 +262,21 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         pred_depths.shape[-2:], mode="nearest"
                     ).view(*(masks.shape[:2]), *(pred_depths.shape[-2:]))
                     masked_depths = pred_depths * resized_masks
-                    for i, rendered_depth in \
+                    for depth_idx, rendered_depth in \
                             enumerate(model_outputs["rendered_depths"]):
                         rendered_depth_loss = adaptive_berhu_loss(
                             masked_depths, rendered_depth, all_ones_masks
                         )
                         loss = loss + (rendered_depth_loss \
                                        * cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT)
-                        losses["rendered_depth_loss_%d" % i] \
+                        losses["rendered_depth_loss_%d" % depth_idx] \
                                 = rendered_depth_loss
 
                         # rendered vs GT depth loss, only for debug
                         rendered_gt_depth_loss = adaptive_berhu_loss(
                             batch["depths"], rendered_depth, all_ones_masks
                         )
-                        losses["rendered_gt_depth_loss_%d" % i] \
+                        losses["rendered_gt_depth_loss_%d" % depth_idx] \
                                 = rendered_gt_depth_loss
 
             if model_kwargs.get("voxel_only", False):
