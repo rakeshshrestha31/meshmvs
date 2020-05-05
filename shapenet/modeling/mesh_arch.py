@@ -330,6 +330,19 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             "postfusion_feat_dims": postfusion_feat_dims
         })
 
+        if cfg.MODEL.VOXEL_HEAD.FREEZE:
+            self.freeze_voxel_head()
+
+    def freeze_voxel_head(self):
+        modules_to_freeze = [
+            self.voxel_head, self.rgb_cnn, self.pre_voxel_depth_cnn
+        ]
+        for module_to_freeze in modules_to_freeze:
+            if module_to_freeze is None:
+                continue
+            for param in module_to_freeze.parameters():
+                param.requires_grad = False
+
     def extract_rgbd_features(
         self, meshes, rgbd_feats, extrinsics
     ):
