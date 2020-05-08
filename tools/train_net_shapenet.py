@@ -240,8 +240,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         batch["depths"], model_outputs["pred_depths"],
                         batch["masks"]
                     )
-                    loss = loss \
-                         + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
+                    if not torch.any(torch.isnan(depth_loss)):
+                        loss = loss \
+                             + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
                     losses["pred_depth_loss"] = depth_loss
                 if "rendered_depths" in model_outputs \
                         and not model_kwargs.get("voxel_only", False):
@@ -258,8 +259,10 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         rendered_depth_loss = adaptive_berhu_loss(
                             masked_depths, rendered_depth, all_ones_masks
                         )
-                        loss = loss + (rendered_depth_loss \
-                                       * cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT)
+                        if not torch.any(torch.isnan(rendered_depth_loss)):
+                            loss = loss \
+                                 + (rendered_depth_loss \
+                                    * cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT)
                         losses["rendered_depth_loss_%d" % i] \
                                 = rendered_depth_loss
 
@@ -342,10 +345,8 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 logger.info(msg % num_infinite_grad)
             cp.step()
 
-            if cp.t % cfg.SOLVER.CHECKPOINT_PERIOD == 0:
-                eval_and_save(model, loaders, optimizer, scheduler, cp)
         cp.step_epoch()
-    eval_and_save(model, loaders, optimizer, scheduler, cp)
+        eval_and_save(model, loaders, optimizer, scheduler, cp)
 
     if comm.is_main_process():
         logger.info("Evaluating on test set:")

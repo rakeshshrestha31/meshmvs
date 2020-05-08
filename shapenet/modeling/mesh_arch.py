@@ -396,7 +396,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             "rendered_depths": rendered_depths
         }
 
-    def predict_depths(self, imgs, masks, extrinsics):
+    def predict_depths(self, imgs, masks, extrinsics, **kwargs):
         """
         Gets predicted depths and depth features
 
@@ -409,9 +409,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         - depths: tensor of shape (B, V, H, W)
         - depth features: list of tenosrs of shape (B*V, C, H, W)
         """
-        mvsnet_output = self.mvsnet(imgs, extrinsics)
         # flatten batch/size and add channel dimension: (B*V, 1, H, W)
-
         def interpolate(tensor, size):
             """ (B, V, H1, W1) -> (B*V, 1, H1, W1)
             """
@@ -420,6 +418,13 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             # (B*V, 1, H, W)
             return F.interpolate(tensor, size, mode="nearest")
 
+        if "depths" in kwargs:
+            gt_depth = kwargs["depths"]
+            gt_depth = interpolate(gt_depth, (56, 56)) \
+                            .view(*(gt_depth.shape[:2]), 56, 56)
+            mvsnet_output = {"depths": gt_depth}
+        else:
+            mvsnet_output = self.mvsnet(imgs, extrinsics)
         depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])
         masks = interpolate(masks, imgs.shape[-2:])
         depths = depths * masks
@@ -432,7 +437,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
 
         return mvsnet_output["depths"], depth_feats
 
-    def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False):
+    def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
         """
         Args:
         - imgs: tensor of shape (B, V, 3, H, W)
@@ -449,7 +454,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         else:
             img_feats = []
 
-        depths, depth_feats = self.predict_depths(imgs, masks, extrinsics)
+        depths, depth_feats = self.predict_depths(imgs, masks, extrinsics, **kwargs)
         masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
         masked_depths = depths * masks_resized
 
