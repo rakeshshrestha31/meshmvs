@@ -12,6 +12,7 @@ import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
+from shapenet.modeling.heads.mesh_loss import MeshLoss
 
 logger = logging.getLogger(__name__)
 
@@ -204,8 +205,11 @@ def evaluate_split(
         if type(module) == VoxMeshDepthHead:
             model_kwargs["masks"] = batch["masks"]
         model_outputs = model(batch["imgs"], **model_kwargs)
-        voxel_scores = model_outputs["voxel_scores"]
         meshes_pred = model_outputs["meshes_pred"]
+        voxel_scores = model_outputs["voxel_scores"]
+        merged_voxel_scores = model_outputs.get(
+            "merged_voxel_scores", None
+        )
 
         # Only compute metrics for the final predicted meshes, not intermediates
         cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"])
@@ -213,6 +217,13 @@ def evaluate_split(
             continue
         for k, v in cur_metrics.items():
             metrics[k].append(v)
+
+        voxel_losses = MeshLoss.voxel_loss(
+            voxel_scores, merged_voxel_scores, batch["voxels"]
+        )
+        # to get metric negate loss
+        for k, v in voxel_losses.items():
+            metrics[k].append(-v.item())
 
         # Store input images and predicted meshes
         if store_predictions:

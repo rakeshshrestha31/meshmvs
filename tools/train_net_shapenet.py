@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import open3d as o3d
 import logging
 import os
 import shutil
@@ -29,6 +30,7 @@ from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
+from shapenet.utils.depth_backprojection import get_points_from_depths
 from meshrcnn.utils.metrics import compare_meshes
 
 logger = logging.getLogger("shapenet")
@@ -254,7 +256,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         pred_depths.shape[-2:], mode="nearest"
                     ).view(*(masks.shape[:2]), *(pred_depths.shape[-2:]))
                     masked_depths = pred_depths * resized_masks
-                    for i, rendered_depth in \
+                    for depth_idx, rendered_depth in \
                             enumerate(model_outputs["rendered_depths"]):
                         rendered_depth_loss = adaptive_berhu_loss(
                             masked_depths, rendered_depth, all_ones_masks
@@ -270,7 +272,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         rendered_gt_depth_loss = adaptive_berhu_loss(
                             batch["depths"], rendered_depth, all_ones_masks
                         )
-                        losses["rendered_gt_depth_loss_%d" % i] \
+                        losses["rendered_gt_depth_loss_%d" % depth_idx] \
                                 = rendered_gt_depth_loss
 
             if model_kwargs.get("voxel_only", False):
@@ -346,7 +348,10 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             cp.step()
 
         cp.step_epoch()
-        eval_and_save(model, loaders, optimizer, scheduler, cp)
+        eval_and_save(
+            model, loaders, optimizer, scheduler, cp,
+            cfg.SOLVER.EARLY_STOP_METRIC
+        )
 
     if comm.is_main_process():
         logger.info("Evaluating on test set:")
@@ -356,7 +361,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
         evaluate_test(model, test_loader)
 
 
-def eval_and_save(model, loaders, optimizer, scheduler, cp):
+def eval_and_save(
+    model, loaders, optimizer, scheduler, cp, early_stop_metric
+):
     # NOTE(gkioxari) For now only do evaluation on the main process
     if comm.is_main_process():
         logger.info("Evaluating on training set:")
@@ -388,7 +395,7 @@ def eval_and_save(model, loaders, optimizer, scheduler, cp):
         """
         cp.store_metric(**train_metrics)
         cp.store_metric(**test_metrics)
-        cp.early_stop_metric = eval_split + "_F1@0.300000"
+        cp.early_stop_metric = eval_split + "_" + early_stop_metric
 
         cp.store_state("model", model.state_dict())
         cp.store_state("optim", optimizer.state_dict())
@@ -474,6 +481,7 @@ def save_predictions(model, loader, output_dir):
             # print("%s_%s: %r" % (label, label_appendix, metrics))
 
 
+@torch.no_grad()
 def save_debug_predictions(batch, model_outputs):
     """
     save voxels and depths
@@ -507,20 +515,33 @@ def save_debug_predictions(batch, model_outputs):
     for stage_idx, pred_mesh in enumerate(model_outputs["meshes_pred"]):
         for batch_idx in range(batch_size):
             label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            view_weights = model_outputs["view_weights"][stage_idx][batch_idx]
+            view_weights = F.normalize(view_weights, dim=-1).squeeze(1)
             save_obj("/tmp/{}_{}_{}_pred_mesh.obj".format(
                 label, label_appendix, stage_idx
             ), pred_mesh[0].verts_packed(), pred_mesh[0].faces_packed())
+            point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                pred_mesh[0].verts_packed().cpu().numpy()
+            ))
+            point_cloud.colors = o3d.utility.Vector3dVector(
+                view_weights.detach().cpu().numpy()
+            )
+            o3d.io.write_point_cloud("/tmp/{}_{}_{}_pred_cloud.ply".format(
+                label, label_appendix, stage_idx
+            ), point_cloud)
 
     if "pred_depths" in model_outputs:
         masks = F.interpolate(
             batch["masks"], model_outputs["pred_depths"].shape[-2:],
             mode="nearest"
         )
+        masked_depths = model_outputs["pred_depths"] * masks
         # TODO: the labels won't be corrent when batch size > 1. Fix it
         save_depths(
-            model_outputs["pred_depths"] * masks,
+            masked_depths,
             "pred_{}_{}".format(label, label_appendix), (137, 137)
         )
+        save_backproj_depths(masked_depths, batch["id_strs"], "depth_cloud")
 
     if "rendered_depths" in model_outputs:
         # TODO: the labels won't be corrent when batch size > 1. Fix it
@@ -530,6 +551,30 @@ def save_debug_predictions(batch, model_outputs):
                 "rendered_{}_{}_{}".format(label, label_appendix, stage_idx),
                 (137, 137)
             )
+            save_backproj_depths(
+                depth, batch["id_strs"], "rendered_cloud_{}".format(stage_idx)
+            )
+
+
+@torch.no_grad()
+def save_backproj_depths(depths, id_strs, prefix):
+    depths = F.interpolate(depths, (224, 224))
+    dtype = depths.dtype
+    device = depths.device
+    intrinsics = torch.tensor([
+        [248.0, 0.0, 111.5], [0.0, 248.0, 111.5], [0.0, 0.0, 1.0]
+    ], dtype=dtype, device=device)
+    depth_points = get_points_from_depths(depths, intrinsics)
+
+    for batch_idx in range(len(depth_points)):
+        label, label_appendix = id_strs[batch_idx].split("-")[:2]
+        for view_idx in range(len(depth_points[batch_idx])):
+            points = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                depth_points[batch_idx][view_idx].detach().cpu().numpy()
+            ))
+            o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}.ply".format(
+                prefix, label, label_appendix, view_idx
+            ), points)
 
 
 def setup_loaders(cfg):

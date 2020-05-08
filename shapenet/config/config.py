@@ -44,6 +44,8 @@ def get_shapenet_cfg():
     cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH = 0.0
     # voxel only iterations
     cfg.MODEL.VOXEL_HEAD.VOXEL_ONLY_ITERS = 100
+    # Whether voxel weights are frozen
+    cfg.MODEL.VOXEL_HEAD.FREEZE = False
 
     # ------------------------------------------------------------------------ #
     # Mesh Head
@@ -101,6 +103,8 @@ def get_shapenet_cfg():
     # stable training
     cfg.SOLVER.SKIP_LOSS_THRESH = 50.0
     cfg.SOLVER.LOSS_SKIP_GAMMA = 0.9
+    # for saving checkpoint
+    cfg.SOLVER.EARLY_STOP_METRIC = "F1@0.300000"
 
     # ------------------------------------------------------------------------ #
     # Datasets
