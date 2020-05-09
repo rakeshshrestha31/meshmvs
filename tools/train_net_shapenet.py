@@ -265,7 +265,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                             loss = loss \
                                  + (rendered_depth_loss \
                                     * cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT)
-                        losses["rendered_depth_loss_%d" % i] \
+                        losses["rendered_depth_loss_%d" % depth_idx] \
                                 = rendered_depth_loss
 
                         # rendered vs GT depth loss, only for debug
