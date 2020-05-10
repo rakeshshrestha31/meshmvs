@@ -1,5 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import torch.nn as nn
+import torch.nn.functional as F
 
 import torchvision
 from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1, conv3x3
@@ -162,6 +163,86 @@ _CUSTOM_RESNET_FUNCS = {
     "resnet152": resnet152,
 }
 
+
+class VGG16P2M(nn.Module):
+    def __init__(self, n_classes_input=3):
+        super(VGG16P2M, self).__init__()
+
+        self.features_dim = 960
+
+        self.conv0_1 = nn.Conv2d(n_classes_input, 16, 3, stride=1, padding=1)
+        self.conv0_2 = nn.Conv2d(16, 16, 3, stride=1, padding=1)
+
+        self.conv1_1 = nn.Conv2d(16, 32, 3, stride=2, padding=1)  # 224 -> 112
+        self.conv1_2 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
+        self.conv1_3 = nn.Conv2d(32, 32, 3, stride=1, padding=1)
+
+        self.conv2_1 = nn.Conv2d(32, 64, 3, stride=2, padding=1)  # 112 -> 56
+        self.conv2_2 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+        self.conv2_3 = nn.Conv2d(64, 64, 3, stride=1, padding=1)
+
+        self.conv3_1 = nn.Conv2d(64, 128, 3, stride=2, padding=1)  # 56 -> 28
+        self.conv3_2 = nn.Conv2d(128, 128, 3, stride=1, padding=1)
+        self.conv3_3 = nn.Conv2d(128, 128, 3, stride=1, padding=1)
+
+        self.conv4_1 = nn.Conv2d(128, 256, 5, stride=2, padding=2)  # 28 -> 14
+        self.conv4_2 = nn.Conv2d(256, 256, 3, stride=1, padding=1)
+        self.conv4_3 = nn.Conv2d(256, 256, 3, stride=1, padding=1)
+
+        self.conv5_1 = nn.Conv2d(256, 512, 5, stride=2, padding=2)  # 14 -> 7
+        self.conv5_2 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
+        self.conv5_3 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
+        self.conv5_4 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
+
+        self._initialize_weights()  # not load the pre-trained model
+
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, img):
+        img = F.relu(self.conv0_1(img))
+        img = F.relu(self.conv0_2(img))
+        # img0 = torch.squeeze(img) # 224
+
+        img = F.relu(self.conv1_1(img))
+        img = F.relu(self.conv1_2(img))
+        img = F.relu(self.conv1_3(img))
+        # img1 = torch.squeeze(img) # 112
+
+        img = F.relu(self.conv2_1(img))
+        img = F.relu(self.conv2_2(img))
+        img = F.relu(self.conv2_3(img))
+        img2 = img
+
+        img = F.relu(self.conv3_1(img))
+        img = F.relu(self.conv3_2(img))
+        img = F.relu(self.conv3_3(img))
+        img3 = img
+
+        img = F.relu(self.conv4_1(img))
+        img = F.relu(self.conv4_2(img))
+        img = F.relu(self.conv4_3(img))
+        img4 = img
+
+        img = F.relu(self.conv5_1(img))
+        img = F.relu(self.conv5_2(img))
+        img = F.relu(self.conv5_3(img))
+        img = F.relu(self.conv5_4(img))
+        img5 = img
+
+        return [img2, img3, img4, img5]
+
+
 def build_backbone(name, pretrained=True):
     resnets = ["resnet18", "resnet34", "resnet50", "resnet101", "resnet152"]
     if name in resnets and name in _FEAT_DIMS:
@@ -178,6 +259,10 @@ def build_custom_backbone(name, input_channels):
         cnn = _CUSTOM_RESNET_FUNCS[name](input_channels=input_channels)
         backbone = ResNetBackbone(cnn)
         feat_dims = _FEAT_DIMS[name]
+        return backbone, feat_dims
+    if name == "vgg":
+        backbone = VGG16P2M(n_classes_input=input_channels)
+        feat_dims = [64, 128, 256, 512]
         return backbone, feat_dims
     else:
         raise ValueError('Unrecognized backbone type "%s"' % name)
