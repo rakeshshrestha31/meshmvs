@@ -143,6 +143,7 @@ def main_worker(worker_id, args):
         "voxel_weight": cfg.MODEL.VOXEL_HEAD.LOSS_WEIGHT,
         "gt_num_samples": cfg.MODEL.MESH_HEAD.GT_NUM_SAMPLES,
         "pred_num_samples": cfg.MODEL.MESH_HEAD.PRED_NUM_SAMPLES,
+        "upsample_pred_mesh": cfg.MODEL.MESH_HEAD.UPSAMPLE_PRED_MESH,
     }
     loss_fn = MeshLoss(**loss_fn_kwargs)
 

@@ -60,6 +60,8 @@ def get_shapenet_cfg():
     # Mesh sampling
     cfg.MODEL.MESH_HEAD.GT_NUM_SAMPLES = 5000
     cfg.MODEL.MESH_HEAD.PRED_NUM_SAMPLES = 5000
+    # whether to upsample mesh for training
+    cfg.MODEL.MESH_HEAD.UPSAMPLE_PRED_MESH = True
     # loss weights
     cfg.MODEL.MESH_HEAD.CHAMFER_LOSS_WEIGHT = 1.0
     cfg.MODEL.MESH_HEAD.NORMALS_LOSS_WEIGHT = 1.0

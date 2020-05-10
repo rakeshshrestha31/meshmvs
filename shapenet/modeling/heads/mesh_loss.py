@@ -19,6 +19,7 @@ class MeshLoss(nn.Module):
         voxel_weight=0.0,
         gt_num_samples=5000,
         pred_num_samples=5000,
+        upsample_pred_mesh=True,
     ):
 
         super(MeshLoss, self).__init__()
@@ -27,6 +28,7 @@ class MeshLoss(nn.Module):
         self.edge_weight = edge_weight
         self.gt_num_samples = gt_num_samples
         self.pred_num_samples = pred_num_samples
+        self.upsample_pred_mesh = upsample_pred_mesh
         self.voxel_weight = voxel_weight
 
         self.skip_mesh_loss = False
@@ -96,13 +98,19 @@ class MeshLoss(nn.Module):
           total_loss (float): The sum of all losses specific to meshes
           losses (dict): All (unweighted) mesh losses in a dictionary
         """
-        zero = torch.tensor(0.0).to(meshes_pred.verts_list()[0])
+        device = meshes_pred.verts_list()[0].device
+        zero = torch.tensor(0.0).to(device)
         losses = {"chamfer": zero, "normal": zero, "edge": zero}
-        points_pred, normals_pred = sample_points_from_meshes(
-            meshes_pred, num_samples=self.pred_num_samples, return_normals=True
-        )
+        if self.upsample_pred_mesh:
+            points_pred, normals_pred = sample_points_from_meshes(
+                meshes_pred, num_samples=self.pred_num_samples,
+                return_normals=True
+            )
+        else:
+            points_pred = meshes_pred.verts_list()
+            normals_pred = meshes_pred.verts_normals_list()
 
-        total_loss = torch.tensor(0.0).to(points_pred)
+        total_loss = torch.tensor(0.0).to(device)
         if points_pred is None or points_gt is None:
             # Sampling failed, so return None
             total_loss = None
@@ -111,7 +119,25 @@ class MeshLoss(nn.Module):
             return total_loss, losses
 
         losses = {}
-        cham_loss, normal_loss = chamfer_distance(points_pred, points_gt, normals_pred, normals_gt)
+        if isinstance(points_pred, list):
+            # list of mesh vertices with different number of vertices per mesh
+            # hence loss calculation cannot be batched
+            assert(len(points_pred) == len(normals_pred))
+            assert(len(points_pred) == points_gt.shape[0])
+            assert(len(normals_pred) == normals_gt.shape[0])
+            cham_loss = torch.tensor(0.0).to(device)
+            normal_loss = torch.tensor(0.0).to(device)
+            for i in range(len(points_pred)):
+                cham_loss_i, normal_loss_i = chamfer_distance(
+                    points_pred[i].unsqueeze(0), points_gt[i].unsqueeze(0),
+                    normals_pred[i].unsqueeze(0), normals_gt[i].unsqueeze(0)
+                )
+                cham_loss = cham_loss + cham_loss_i
+                normal_loss = normal_loss + normal_loss_i
+        else:
+            cham_loss, normal_loss = chamfer_distance(
+                points_pred, points_gt, normals_pred, normals_gt
+            )
 
         total_loss = total_loss + self.chamfer_weight * cham_loss
         total_loss = total_loss + self.normal_weight * normal_loss
