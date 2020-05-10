@@ -325,6 +325,8 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
 
         print({
             "rgb_feat_dims": rgb_feat_dims,
+            "pre_voxel_depth_feat_dims": pre_voxel_depth_feat_dims,
+            "post_voxel_depth_feat_dims": post_voxel_depth_feat_dims,
             "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
             "prefusion_feat_dims": prefusion_feat_dims,
             "postfusion_feat_dims": postfusion_feat_dims
