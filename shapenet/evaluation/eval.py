@@ -204,6 +204,8 @@ def evaluate_split(
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if type(module) == VoxMeshDepthHead:
             model_kwargs["masks"] = batch["masks"]
+            if module.mvsnet is None:
+                model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
         meshes_pred = model_outputs["meshes_pred"]
         voxel_scores = model_outputs["voxel_scores"]

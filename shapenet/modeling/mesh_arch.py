@@ -284,7 +284,8 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         self.contrastive_depth_input = cfg.MODEL.CONTRASTIVE_DEPTH_INPUT
         self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
 
-        self.mvsnet = MVSNet(cfg.MODEL.MVSNET)
+        self.mvsnet = MVSNet(cfg.MODEL.MVSNET) if not cfg.MODEL.USE_GT_DEPTH \
+                        else None
         if cfg.MODEL.RGB_FEATURES_INPUT:
             self.rgb_cnn, rgb_feat_dims \
                     = build_backbone(cfg.MODEL.BACKBONE)
@@ -331,6 +332,7 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             "prefusion_feat_dims": prefusion_feat_dims,
             "postfusion_feat_dims": postfusion_feat_dims
         })
+        print("Using GT depth input:", cfg.MODEL.USE_GT_DEPTH)
 
         if cfg.MODEL.VOXEL_HEAD.FREEZE:
             self.freeze_voxel_head()
@@ -433,11 +435,15 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             # (B*V, 1, H, W)
             return F.interpolate(tensor, size, mode="nearest")
 
-        if "depths" in kwargs:
-            gt_depth = kwargs["depths"]
-            gt_depth = interpolate(gt_depth, (56, 56)) \
-                            .view(*(gt_depth.shape[:2]), 56, 56)
-            mvsnet_output = {"depths": gt_depth}
+        if self.mvsnet is None:
+            if "depths" in kwargs:
+                gt_depth = kwargs["depths"]
+                gt_depth = interpolate(gt_depth, (56, 56)) \
+                                .view(*(gt_depth.shape[:2]), 56, 56)
+                mvsnet_output = {"depths": gt_depth}
+            else:
+                print("both gt depth and mvsnet unavailable")
+                exit(1)
         else:
             mvsnet_output = self.mvsnet(imgs, extrinsics)
         depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])

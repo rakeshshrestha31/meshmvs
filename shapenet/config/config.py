@@ -17,6 +17,7 @@ def get_shapenet_cfg():
     cfg.MODEL.MESH_ON = False
     cfg.MODEL.CONTRASTIVE_DEPTH_INPUT = True
     cfg.MODEL.RGB_FEATURES_INPUT = False
+    cfg.MODEL.USE_GT_DEPTH = False
     # options: multihead_attention | simple_attention | stats
     cfg.MODEL.FEATURE_FUSION_METHOD = "multihead_attention"
     cfg.MODEL.MULTIHEAD_ATTENTION =CN()

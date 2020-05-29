@@ -208,6 +208,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 model_kwargs["extrinsics"] = batch["extrinsics"]
             if type(module) == VoxMeshDepthHead:
                 model_kwargs["masks"] = batch["masks"]
+                if module.mvsnet is None:
+                    model_kwargs["depths"] = batch["depths"]
+
             with Timer("Forward"):
                 model_outputs = model(batch["imgs"], **model_kwargs)
                 voxel_scores = model_outputs["voxel_scores"]
