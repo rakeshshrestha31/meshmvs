@@ -36,7 +36,7 @@ from meshrcnn.utils.metrics import compare_meshes
 logger = logging.getLogger("shapenet")
 P2M_SCALE = 0.57
 NUM_PRED_SURFACE_SAMPLES = 6466
-NUM_GT_SURFACE_SAMPLES = 6466
+NUM_GT_SURFACE_SAMPLES = 9000
 
 
 def copy_data(args):
@@ -88,6 +88,26 @@ def main_worker_eval(worker_id, args):
     model.load_state_dict(state_dict)
     logger.info("Model loaded")
     model.to(device)
+
+    def disable_running_stats(model):
+        if type(model).__name__.startswith("BatchNorm"):
+            model.track_running_stats = False
+        else:
+            for m in model.children():
+                disable_running_stats(m)
+    # disable_running_stats(model)
+
+    val_loader = build_data_loader(
+        cfg, get_dataset_name(cfg), "test", multigpu=False
+    )
+    logger.info("val - %d" % len(val_loader))
+    test_metrics, test_preds = evaluate_split(
+        model, val_loader, prefix="val_", max_predictions=100
+    )
+    str_out = "Results on test"
+    for k, v in test_metrics.items():
+        str_out += "%s %.4f " % (k, v)
+    logger.info(str_out)
 
     prediction_dir = os.path.join(
         cfg.OUTPUT_DIR, "predictions", "eval", "predict", "0"
@@ -438,6 +458,7 @@ def save_predictions(model, loader, output_dir):
 
         # TODO: debug only
         # save_debug_predictions(batch, model_outputs)
+        # continue
 
         pred_mesh = model_outputs["meshes_pred"][-1]
         gt_mesh = batch["meshes"]
