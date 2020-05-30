@@ -466,6 +466,8 @@ def save_predictions(model, loader, output_dir):
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if type(module) == VoxMeshDepthHead:
             model_kwargs["masks"] = batch["masks"]
+            if module.mvsnet is None:
+                model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
 
         # TODO: debug only
