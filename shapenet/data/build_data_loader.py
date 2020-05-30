@@ -64,9 +64,11 @@ def build_data_loader(
         dset = MeshVoxDataset(**dataset_args)
         collate_fn = MeshVoxDataset.collate_fn
     elif dataset == "MeshVoxMultiView":
+        dataset_args["input_views"] = cfg.DATASETS.INPUT_VIEWS
         dset = MeshVoxMultiViewDataset(**dataset_args)
         collate_fn = MeshVoxMultiViewDataset.collate_fn
     elif dataset == "MeshVoxDepth":
+        dataset_args["input_views"] = cfg.DATASETS.INPUT_VIEWS
         dset = MeshVoxDepthDataset(**dataset_args)
         collate_fn = MeshVoxDepthDataset.collate_fn
     else:

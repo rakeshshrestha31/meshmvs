@@ -117,6 +117,8 @@ def get_shapenet_cfg():
     # ['depth', 'multi_view', 'single_view']
     cfg.DATASETS.TYPE = "single_view"
 
+    cfg.DATASETS.INPUT_VIEWS = [0, 6, 7]
+
     # ------------------------------------------------------------------------ #
     # Misc options
     # ------------------------------------------------------------------------ #

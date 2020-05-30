@@ -34,13 +34,15 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
         sample_online=False,
         in_memory=False,
         return_id_str=False,
+        input_views=[0, 6, 7],
         depth_only=False,
     ):
         MeshVoxMultiViewDataset.__init__(
             self, data_dir, normalize_images=normalize_images,
             split=split, return_mesh=return_mesh, voxel_size=voxel_size,
             num_samples=num_samples, sample_online=sample_online,
-            in_memory=in_memory, return_id_str=return_id_str
+            in_memory=in_memory, return_id_str=return_id_str,
+            input_views=input_views
         )
         self.set_depth_only(depth_only)
 

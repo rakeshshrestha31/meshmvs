@@ -27,6 +27,7 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
         sample_online=False,
         in_memory=False,
         return_id_str=False,
+        input_views=[0, 6, 7],
     ):
         # call the PyTorch Dataset interface in this way
         # since the immediate parent is MeshVoxDataset
@@ -45,7 +46,7 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
         self.model_ids = []
         self.mid_to_samples = {}
         # TODO: get the image ids from parameters
-        self.image_ids = [0, 6, 7]
+        self.image_ids = input_views
 
         self.transform = self.get_transform(normalize_images)
 
