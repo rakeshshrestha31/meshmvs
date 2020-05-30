@@ -22,7 +22,8 @@ from pytorch3d.io import save_obj
 
 from shapenet.config import get_shapenet_cfg
 from shapenet.data import build_data_loader, register_shapenet
-from shapenet.evaluation import evaluate_split, evaluate_test, evaluate_test_p2m
+from shapenet.evaluation import \
+        evaluate_split, evaluate_test, evaluate_test_p2m, evaluate_vox
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
@@ -109,10 +110,21 @@ def main_worker_eval(worker_id, args):
         str_out += "%s %.4f " % (k, v)
     logger.info(str_out)
 
-    prediction_dir = os.path.join(
-        cfg.OUTPUT_DIR, "predictions", "eval", "predict", "0"
-    )
-    save_predictions(model, test_loader, prediction_dir)
+    if args.eval_vox:
+        prediction_dir = os.path.join(
+            cfg.OUTPUT_DIR, "predictions"
+        )
+        test_metrics = evaluate_vox(model, test_loader, prediction_dir)
+        print(test_metrics)
+        str_out = "Results on test"
+        for k, v in test_metrics.items():
+            str_out += "%s %.4f " % (k, v)
+        logger.info(str_out)
+    else:
+        prediction_dir = os.path.join(
+            cfg.OUTPUT_DIR, "predictions", "eval", "predict", "0"
+        )
+        save_predictions(model, test_loader, prediction_dir)
     exit(0)
 
     if args.eval_p2m:

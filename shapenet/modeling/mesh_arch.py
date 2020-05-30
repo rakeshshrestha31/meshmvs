@@ -259,6 +259,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
             return {
                 "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
+                "transformed_voxel_scores": transformed_voxel_scores,
                 "view_weights": view_weights
             }
 
@@ -271,6 +272,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         return {
             "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
+            "transformed_voxel_scores": transformed_voxel_scores,
             "view_weights": view_weights
         }
 
@@ -534,8 +536,9 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             )
             rendered_depths = [i["rendered_depths"] for i in mesh_features]
             return {
-                "voxel_scores":voxel_scores, "meshes_pred": dummy_refined,
+                "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
+                "transformed_voxel_scores": transformed_voxel_scores,
                 "pred_depths": depths, "rendered_depths": rendered_depths,
                 "view_weights": view_weights
             }
@@ -566,8 +569,9 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         # exit(0)
 
         return {
-            "voxel_scores":voxel_scores, "meshes_pred": refined_meshes,
+            "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
+            "transformed_voxel_scores": transformed_voxel_scores,
             "pred_depths": depths, "rendered_depths": rendered_depths,
             "view_weights": view_weights
         }
