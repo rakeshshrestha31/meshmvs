@@ -119,25 +119,9 @@ class MeshLoss(nn.Module):
             return total_loss, losses
 
         losses = {}
-        if isinstance(points_pred, list):
-            # list of mesh vertices with different number of vertices per mesh
-            # hence loss calculation cannot be batched
-            assert(len(points_pred) == len(normals_pred))
-            assert(len(points_pred) == points_gt.shape[0])
-            assert(len(normals_pred) == normals_gt.shape[0])
-            cham_loss = torch.tensor(0.0).to(device)
-            normal_loss = torch.tensor(0.0).to(device)
-            for i in range(len(points_pred)):
-                cham_loss_i, normal_loss_i = chamfer_distance(
-                    points_pred[i].unsqueeze(0), points_gt[i].unsqueeze(0),
-                    normals_pred[i].unsqueeze(0), normals_gt[i].unsqueeze(0)
-                )
-                cham_loss = cham_loss + cham_loss_i
-                normal_loss = normal_loss + normal_loss_i
-        else:
-            cham_loss, normal_loss = chamfer_distance(
-                points_pred, points_gt, normals_pred, normals_gt
-            )
+        cham_loss, normal_loss = chamfer_distance(
+            points_pred, points_gt, x_normals=normals_pred, y_normals=normals_gt
+        )
 
         total_loss = total_loss + self.chamfer_weight * cham_loss
         total_loss = total_loss + self.normal_weight * normal_loss
