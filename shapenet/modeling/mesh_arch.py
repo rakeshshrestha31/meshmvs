@@ -578,6 +578,106 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
 
 
 @MESH_ARCH_REGISTRY.register()
+class VoxDepthHead(VoxMeshDepthHead):
+    """
+    voxel prediction with depth features
+    """
+    def __init__(self, cfg):
+        nn.Module.__init__(self)
+        VoxMeshMultiViewHead.setup(self, cfg)
+
+        self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
+        self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
+        self.mvsnet = MVSNet(cfg.MODEL.MVSNET) if not cfg.MODEL.USE_GT_DEPTH \
+                        else None
+        if cfg.MODEL.RGB_FEATURES_INPUT:
+            self.rgb_cnn, rgb_feat_dims \
+                    = build_backbone(cfg.MODEL.BACKBONE)
+        else:
+            self.rgb_cnn, rgb_feat_dims = None, [0]
+
+        self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+            = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+
+        # voxel head
+        cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
+                rgb_feat_dims[-1] + pre_voxel_depth_feat_dims[-1]
+        self.voxel_head = VoxelHead(cfg)
+
+        print({
+            "rgb_feat_dims": rgb_feat_dims,
+            "pre_voxel_depth_feat_dims": pre_voxel_depth_feat_dims,
+            "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
+        })
+        print("Using GT depth input:", cfg.MODEL.USE_GT_DEPTH)
+
+        if cfg.MODEL.VOXEL_HEAD.FREEZE:
+            self.freeze_voxel_head()
+
+    def forward(
+        self, imgs, intrinsics, extrinsics, masks,
+        voxel_only=False, **kwargs
+    ):
+        """
+        Args:
+        - imgs: tensor of shape (B, V, 3, H, W)
+        - intrinsics: tensor of shape (B, V, 4, 4)
+        - extrinsics: tensor of shape (B, V, 4, 4)
+        """
+        batch_size = imgs.shape[0]
+        num_views = imgs.shape[1]
+        device = imgs.device
+
+        if self.rgb_cnn is not None:
+            # features shape: (B*V, C, H, W)
+            img_feats = self.rgb_cnn(imgs.view(-1, *(imgs.shape[2:])))
+        else:
+            img_feats = []
+
+        depths, depth_feats = self.predict_depths(imgs, masks, extrinsics, **kwargs)
+        masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
+        masked_depths = depths * masks_resized
+
+        # merge RGB and depth features
+        if img_feats:
+            rgbd_feats = [
+                torch.cat((i, j), dim=1) for i, j in zip(img_feats, depth_feats)
+            ]
+        else:
+            rgbd_feats = depth_feats
+
+        voxel_scores = self.voxel_head(rgbd_feats[-1])
+        # unflatten the batch and views
+        voxel_scores = voxel_scores.view(
+            batch_size, num_views, *(voxel_scores.shape[1:])
+        )
+        if self.single_view_voxel_prediction:
+            merged_voxel_scores = voxel_scores[:, 0]
+            transformed_voxel_scores = merged_voxel_scores
+            voxel_scores = [voxel_scores[:, 0]]
+        else:
+            K = self._get_projection_matrix(batch_size, device)
+            rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
+            P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
+            merged_voxel_scores, transformed_voxel_scores \
+                = merge_multi_view_voxels(
+                    voxel_scores, extrinsics,
+                    self.voxel_size, self.cubify_threshold,
+                    # logit score that makes a cell non-occupied
+                    self.cubify_threshold_logit - 1e-1
+                )
+            # separate views into list items
+            voxel_scores = voxel_scores.unbind(1)
+
+        return {
+            "voxel_scores": voxel_scores,
+            "merged_voxel_scores": merged_voxel_scores,
+            "transformed_voxel_scores": transformed_voxel_scores,
+            "pred_depths": depths,
+        }
+
+
+@MESH_ARCH_REGISTRY.register()
 class SphereInitHead(nn.Module):
     def __init__(self, cfg):
         super(SphereInitHead, self).__init__()

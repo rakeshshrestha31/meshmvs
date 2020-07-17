@@ -28,6 +28,7 @@ def build_data_loader(
         batch_size = cfg.SOLVER.BATCH_SIZE_EVAL
         return_mesh = True
         sample_online = True
+        return_id_str = True
     elif split_name == "test":
         batch_size = cfg.SOLVER.BATCH_SIZE_EVAL
         return_mesh = True
