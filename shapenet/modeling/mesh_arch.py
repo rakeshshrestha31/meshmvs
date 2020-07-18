@@ -411,19 +411,21 @@ class VoxDepthHead(VoxMeshMultiViewHead):
             ]
         return voxel_scores, rgbd_feats, img_feats
 
-    def merge_multi_view_voxel_scores(
-        self, voxel_scores, extrinsics, batch_size, device
-    ):
-
+    def process_extrinsics(self, extrinsics, batch_size, device):
         K = self._get_projection_matrix(batch_size, device)
         rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
         P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
+        return rel_extrinsics, P
+
+    def merge_multi_view_voxel_scores(
+        self, voxel_scores, extrinsics
+    ):
         merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
             voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
             # logit score that makes a cell non-occupied
             self.cubify_threshold_logit - 1e-1
         )
-        return merged_voxel_scores, transformed_voxel_scores, rel_extrinsics, P
+        return merged_voxel_scores, transformed_voxel_scores
 
     def forward(
         self, imgs, intrinsics, extrinsics, masks,
@@ -456,10 +458,8 @@ class VoxDepthHead(VoxMeshMultiViewHead):
             transformed_voxel_scores = merged_voxel_scores
             voxel_scores = [voxel_scores[:, 0]]
         else:
-            merged_voxel_scores, transformed_voxel_scores, _, _ \
-                = self.merge_multi_view_voxel_scores(
-                    voxel_scores, extrinsics, batch_size, device
-                )
+            merged_voxel_scores, transformed_voxel_scores \
+                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
             # separate views into list items
             voxel_scores = voxel_scores.unbind(1)
 
@@ -477,6 +477,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         nn.Module.__init__(self)
         VoxMeshMultiViewHead.setup(self, cfg)
 
+        self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
         self.contrastive_depth_input = cfg.MODEL.CONTRASTIVE_DEPTH_INPUT
         self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
 
@@ -622,13 +623,18 @@ class VoxMeshDepthHead(VoxDepthHead):
                 batch_size, num_views, voxel_scores, rgbd_feats, img_feats
             )
 
-        merged_voxel_scores, transformed_voxel_scores, rel_extrinsics, P \
-            = self.merge_multi_view_voxel_scores(
-                voxel_scores, extrinsics, batch_size, device
-            )
+        if self.single_view_voxel_prediction:
+            merged_voxel_scores = voxel_scores[:, 0]
+            transformed_voxel_scores = merged_voxel_scores
+            voxel_scores = [voxel_scores[:, 0]]
+        else:
+            merged_voxel_scores, transformed_voxel_scores \
+                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
+            # separate views into list items
+            voxel_scores = voxel_scores.unbind(1)
 
-        # separate views into list items
-        voxel_scores = voxel_scores.unbind(1)
+        rel_extrinsics, P \
+            = self.process_extrinsics(extrinsics, batch_size, device)
 
         if self.contrastive_depth_input:
             def feats_extractor(*args, **kwargs):
