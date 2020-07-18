@@ -14,7 +14,8 @@ from meshrcnn.utils.metrics import compare_meshes
 
 import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
-from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
+from shapenet.modeling.mesh_arch import \
+    VoxMeshMultiViewHead, VoxMeshDepthHead, VoxDepthHead
 from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
 from shapenet.modeling.heads.mesh_loss import MeshLoss
 from shapenet.modeling.mesh_arch import cubify
@@ -264,7 +265,7 @@ def evaluate_split(
 
 
 @torch.no_grad()
-def evaluate_vox(model, loader, prediction_dir):
+def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
     """
     This function is used to report validation performance of voxel head output
     """
@@ -273,28 +274,31 @@ def evaluate_vox(model, loader, prediction_dir):
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
         model = model.module
 
-    for prefix in ["merged", "vox_0", "vox_1", "vox_2"]:
-        output_dir = pred_filename = os.path.join(
-            prediction_dir, prefix, "predict", "0"
-        )
-        os.makedirs(output_dir, exist_ok=True)
+    if prediction_dir is not None:
+        for prefix in ["merged", "vox_0", "vox_1", "vox_2"]:
+            output_dir = pred_filename = os.path.join(
+                prediction_dir, prefix, "predict", "0"
+            )
+            os.makedirs(output_dir, exist_ok=True)
 
     device = torch.device("cuda:0")
     metrics = defaultdict(list)
     deprocess = imagenet_deprocess(rescale_image=False)
     for batch_idx, batch in tqdm.tqdm(enumerate(loader)):
+        if max_predictions >= 1 and batch_idx > max_predictions:
+            break
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
-        if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+        if type(module) in \
+                [VoxMeshMultiViewHead, VoxMeshDepthHead, VoxDepthHead]:
             model_kwargs["intrinsics"] = batch["intrinsics"]
             model_kwargs["extrinsics"] = batch["extrinsics"]
-        if type(module) == VoxMeshDepthHead:
+        if type(module) in [VoxMeshDepthHead, VoxDepthHead]:
             model_kwargs["masks"] = batch["masks"]
             if module.mvsnet is None:
                 model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
-        meshes_pred = model_outputs["meshes_pred"]
         voxel_scores = model_outputs["voxel_scores"]
         transformed_voxel_scores = model_outputs["transformed_voxel_scores"]
         merged_voxel_scores = model_outputs.get(
@@ -305,12 +309,14 @@ def evaluate_vox(model, loader, prediction_dir):
         # as `compare_meshes` returns the euclidean distance (L2) of two pointclouds.
         # In Pixel2Mesh, the squared L2 (L2^2) is computed instead.
         # i.e. (L2^2 < τ) <=> (L2 < sqrt(τ))
-        cur_metrics = compare_meshes(
-            meshes_pred[-1], batch["meshes"],
-            scale=0.57, thresholds=[0.01, 0.014142]
-        )
-        for k, v in cur_metrics.items():
-            metrics["final_" + k].append(v)
+        if "meshes_pred" in model_outputs:
+            meshes_pred = model_outputs["meshes_pred"]
+            cur_metrics = compare_meshes(
+                meshes_pred[-1], batch["meshes"],
+                scale=0.57, thresholds=[0.01, 0.014142]
+            )
+            for k, v in cur_metrics.items():
+                metrics["final_" + k].append(v)
 
         # cubify all the voxel scores
         merged_vox_mesh = cubify(
@@ -334,27 +340,31 @@ def evaluate_vox(model, loader, prediction_dir):
         gt_points = gt_points.cpu().detach().numpy()
 
         # save meshes
-        for mesh_idx in range(len(batch["id_strs"])):
-            label, label_appendix = batch["id_strs"][mesh_idx].split("-")[:2]
-            for prefix, vox_mesh in vox_meshes.items():
-                output_dir = pred_filename = os.path.join(
-                    prediction_dir, prefix, "predict", "0"
-                )
-                pred_filename = os.path.join(
-                    output_dir, "{}_{}_predict.xyz".format(label, label_appendix)
-                )
-                gt_filename = os.path.join(
-                    output_dir, "{}_{}_ground.xyz".format(label, label_appendix)
-                )
+        if prediction_dir is not None:
+            for mesh_idx in range(len(batch["id_strs"])):
+                label, label_appendix \
+                        = batch["id_strs"][mesh_idx].split("-")[:2]
+                for prefix, vox_mesh in vox_meshes.items():
+                    output_dir = pred_filename = os.path.join(
+                        prediction_dir, prefix, "predict", "0"
+                    )
+                    pred_filename = os.path.join(
+                        output_dir,
+                        "{}_{}_predict.xyz".format(label, label_appendix)
+                    )
+                    gt_filename = os.path.join(
+                        output_dir,
+                        "{}_{}_ground.xyz".format(label, label_appendix)
+                    )
 
-                pred_mesh = vox_mesh[mesh_idx].scale_verts(0.57)
-                pred_points = sample_points_from_meshes(
-                    pred_mesh, 6466, return_normals=False
-                )
-                pred_points = pred_points.cpu().detach().numpy()
+                    pred_mesh = vox_mesh[mesh_idx].scale_verts(0.57)
+                    pred_points = sample_points_from_meshes(
+                        pred_mesh, 6466, return_normals=False
+                    )
+                    pred_points = pred_points.cpu().detach().numpy()
 
-                np.savetxt(pred_filename, pred_points[mesh_idx])
-                np.savetxt(gt_filename, gt_points[mesh_idx])
+                    np.savetxt(pred_filename, pred_points[mesh_idx])
+                    np.savetxt(gt_filename, gt_points[mesh_idx])
 
         # find accuracy of each cubified voxel meshes
         for prefix, vox_mesh in vox_meshes.items():

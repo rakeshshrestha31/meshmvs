@@ -47,6 +47,9 @@ def get_shapenet_cfg():
     cfg.MODEL.VOXEL_HEAD.VOXEL_ONLY_ITERS = 100
     # Whether voxel weights are frozen
     cfg.MODEL.VOXEL_HEAD.FREEZE = False
+    # Whether to use single view voxel prediction
+    # without probabilistic merging
+    cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW = False
 
     # ------------------------------------------------------------------------ #
     # Mesh Head
@@ -86,7 +89,7 @@ def get_shapenet_cfg():
     cfg.MODEL.MVSNET.PRINCIPAL_POINT = (111.5, 111.5)
     # loss weights
     cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT = 0.1
-    cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT = 0.001
+    cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT = 0.00
 
     # ------------------------------------------------------------------------ #
     # Solver

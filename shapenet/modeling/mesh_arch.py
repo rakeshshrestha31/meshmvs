@@ -278,11 +278,206 @@ class VoxMeshMultiViewHead(VoxMeshHead):
 
 
 @MESH_ARCH_REGISTRY.register()
-class VoxMeshDepthHead(VoxMeshMultiViewHead):
+class VoxDepthHead(VoxMeshMultiViewHead):
+    """
+    voxel prediction with depth features
+    """
     def __init__(self, cfg):
         nn.Module.__init__(self)
         VoxMeshMultiViewHead.setup(self, cfg)
 
+        self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
+        self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
+        self.mvsnet = MVSNet(cfg.MODEL.MVSNET) if not cfg.MODEL.USE_GT_DEPTH \
+                        else None
+        if cfg.MODEL.RGB_FEATURES_INPUT:
+            self.rgb_cnn, rgb_feat_dims \
+                    = build_backbone(cfg.MODEL.BACKBONE)
+        else:
+            self.rgb_cnn, rgb_feat_dims = None, [0]
+
+        self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+            = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+
+        # voxel head
+        cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
+                rgb_feat_dims[-1] + pre_voxel_depth_feat_dims[-1]
+        self.voxel_head = VoxelHead(cfg)
+
+        print({
+            "rgb_feat_dims": rgb_feat_dims,
+            "pre_voxel_depth_feat_dims": pre_voxel_depth_feat_dims,
+            "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
+        })
+        print("Using GT depth input:", cfg.MODEL.USE_GT_DEPTH)
+
+        if cfg.MODEL.VOXEL_HEAD.FREEZE:
+            self.freeze_voxel_head()
+
+    def freeze_voxel_head(self):
+        modules_to_freeze = [
+            self.voxel_head, self.rgb_cnn, self.pre_voxel_depth_cnn
+        ]
+        for module_to_freeze in modules_to_freeze:
+            if module_to_freeze is None:
+                continue
+            for param in module_to_freeze.parameters():
+                param.requires_grad = False
+
+    def predict_depths(self, imgs, masks, extrinsics, **kwargs):
+        """
+        Gets predicted depths and depth features
+
+        Args:
+        - imgs: tensor of shape (B, V, 3, H, W)
+        - intrinsics: tensor of shape (B, V, 4, 4)
+        - extrinsics: tensor of shape (B, V, 4, 4)
+
+        Returns:
+        - depths: tensor of shape (B, V, H, W)
+        - depth features: list of tenosrs of shape (B*V, C, H, W)
+        """
+        # flatten batch/size and add channel dimension: (B*V, 1, H, W)
+        def interpolate(tensor, size):
+            """ (B, V, H1, W1) -> (B*V, 1, H1, W1)
+            """
+            # (B*V, 1, H, W)
+            tensor = tensor.view(-1, 1, *(tensor.shape[2:]))
+            # (B*V, 1, H, W)
+            return F.interpolate(tensor, size, mode="nearest")
+
+        if self.mvsnet is None:
+            if "depths" in kwargs:
+                gt_depth = kwargs["depths"]
+                gt_depth = interpolate(gt_depth, (56, 56)) \
+                                .view(*(gt_depth.shape[:2]), 56, 56)
+                mvsnet_output = {"depths": gt_depth}
+            else:
+                print("both gt depth and mvsnet unavailable")
+                exit(1)
+        else:
+            mvsnet_output = self.mvsnet(imgs, extrinsics)
+        depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])
+        masks = interpolate(masks, imgs.shape[-2:])
+        depths = depths * masks
+
+        # features shape: (B*V, C, H, W)
+        depth_feats = self.pre_voxel_depth_cnn(depths)
+        batch_size, num_views = mvsnet_output["depths"].shape[:2]
+        # (B, V, 1, H, W)
+        depths = depths.view(batch_size, num_views, *(depths.shape[-2:]))
+
+        return mvsnet_output["depths"], depth_feats
+
+    def extract_rgb_features(self, imgs):
+        if self.rgb_cnn is not None:
+            # features shape: (B*V, C, H, W)
+            img_feats = self.rgb_cnn(imgs.view(-1, *(imgs.shape[2:])))
+        else:
+            img_feats = []
+        return img_feats
+
+
+    def extract_depth_features(self, imgs, masks, extrinsics, **kwargs):
+        depths, depth_feats = self.predict_depths(imgs, masks, extrinsics, **kwargs)
+        masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
+        masked_depths = depths * masks_resized
+        return depth_feats, depths, masked_depths
+
+    def merge_rgbd_features(self, img_feats, depth_feats):
+        # merge RGB and depth features
+        if img_feats:
+            rgbd_feats = [
+                torch.cat((i, j), dim=1) for i, j in zip(img_feats, depth_feats)
+            ]
+        else:
+            rgbd_feats = depth_feats
+        return rgbd_feats
+
+    @staticmethod
+    def unflatten_features_batch_views(
+        batch_size, num_views, voxel_scores, rgbd_feats, img_feats
+    ):
+        # unflatten the batch and views
+        voxel_scores = voxel_scores.view(
+            batch_size, num_views, *(voxel_scores.shape[1:])
+        )
+        rgbd_feats = [
+            i.view(batch_size, num_views, *(i.shape[1:])) for i in rgbd_feats
+        ]
+        if img_feats:
+            img_feats = [
+                i.view(batch_size, num_views, *(i.shape[1:])) for i in img_feats
+            ]
+        return voxel_scores, rgbd_feats, img_feats
+
+    def process_extrinsics(self, extrinsics, batch_size, device):
+        K = self._get_projection_matrix(batch_size, device)
+        rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
+        P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
+        return rel_extrinsics, P
+
+    def merge_multi_view_voxel_scores(
+        self, voxel_scores, extrinsics
+    ):
+        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
+            voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
+            # logit score that makes a cell non-occupied
+            self.cubify_threshold_logit - 1e-1
+        )
+        return merged_voxel_scores, transformed_voxel_scores
+
+    def forward(
+        self, imgs, intrinsics, extrinsics, masks,
+        voxel_only=False, **kwargs
+    ):
+        """
+        Args:
+        - imgs: tensor of shape (B, V, 3, H, W)
+        - intrinsics: tensor of shape (B, V, 4, 4)
+        - extrinsics: tensor of shape (B, V, 4, 4)
+        """
+        batch_size = imgs.shape[0]
+        num_views = imgs.shape[1]
+        device = imgs.device
+
+        img_feats = self.extract_rgb_features(imgs)
+        depth_feats, depths, masked_depths = self.extract_depth_features(
+            imgs, masks, extrinsics, **kwargs
+        )
+        rgbd_feats = self.merge_rgbd_features(img_feats, depth_feats)
+
+        voxel_scores = self.voxel_head(rgbd_feats[-1])
+        voxel_scores, rgbd_feats, img_feats \
+            = self.unflatten_features_batch_views(
+                batch_size, num_views, voxel_scores, rgbd_feats, img_feats
+            )
+
+        if self.single_view_voxel_prediction:
+            merged_voxel_scores = voxel_scores[:, 0]
+            transformed_voxel_scores = merged_voxel_scores
+            voxel_scores = [voxel_scores[:, 0]]
+        else:
+            merged_voxel_scores, transformed_voxel_scores \
+                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
+            # separate views into list items
+            voxel_scores = voxel_scores.unbind(1)
+
+        return {
+            "voxel_scores": voxel_scores,
+            "merged_voxel_scores": merged_voxel_scores,
+            "transformed_voxel_scores": transformed_voxel_scores,
+            "pred_depths": depths,
+        }
+
+
+@MESH_ARCH_REGISTRY.register()
+class VoxMeshDepthHead(VoxDepthHead):
+    def __init__(self, cfg):
+        nn.Module.__init__(self)
+        VoxMeshMultiViewHead.setup(self, cfg)
+
+        self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
         self.contrastive_depth_input = cfg.MODEL.CONTRASTIVE_DEPTH_INPUT
         self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
 
@@ -338,16 +533,6 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
 
         if cfg.MODEL.VOXEL_HEAD.FREEZE:
             self.freeze_voxel_head()
-
-    def freeze_voxel_head(self):
-        modules_to_freeze = [
-            self.voxel_head, self.rgb_cnn, self.pre_voxel_depth_cnn
-        ]
-        for module_to_freeze in modules_to_freeze:
-            if module_to_freeze is None:
-                continue
-            for param in module_to_freeze.parameters():
-                param.requires_grad = False
 
     def extract_rgbd_features(
         self, meshes, rgbd_feats, extrinsics
@@ -415,51 +600,6 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
             "rendered_depths": rendered_depths
         }
 
-    def predict_depths(self, imgs, masks, extrinsics, **kwargs):
-        """
-        Gets predicted depths and depth features
-
-        Args:
-        - imgs: tensor of shape (B, V, 3, H, W)
-        - intrinsics: tensor of shape (B, V, 4, 4)
-        - extrinsics: tensor of shape (B, V, 4, 4)
-
-        Returns:
-        - depths: tensor of shape (B, V, H, W)
-        - depth features: list of tenosrs of shape (B*V, C, H, W)
-        """
-        # flatten batch/size and add channel dimension: (B*V, 1, H, W)
-        def interpolate(tensor, size):
-            """ (B, V, H1, W1) -> (B*V, 1, H1, W1)
-            """
-            # (B*V, 1, H, W)
-            tensor = tensor.view(-1, 1, *(tensor.shape[2:]))
-            # (B*V, 1, H, W)
-            return F.interpolate(tensor, size, mode="nearest")
-
-        if self.mvsnet is None:
-            if "depths" in kwargs:
-                gt_depth = kwargs["depths"]
-                gt_depth = interpolate(gt_depth, (56, 56)) \
-                                .view(*(gt_depth.shape[:2]), 56, 56)
-                mvsnet_output = {"depths": gt_depth}
-            else:
-                print("both gt depth and mvsnet unavailable")
-                exit(1)
-        else:
-            mvsnet_output = self.mvsnet(imgs, extrinsics)
-        depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])
-        masks = interpolate(masks, imgs.shape[-2:])
-        depths = depths * masks
-
-        # features shape: (B*V, C, H, W)
-        depth_feats = self.pre_voxel_depth_cnn(depths)
-        batch_size, num_views = mvsnet_output["depths"].shape[:2]
-        # (B, V, 1, H, W)
-        depths = depths.view(batch_size, num_views, *(depths.shape[-2:]))
-
-        return mvsnet_output["depths"], depth_feats
-
     def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
         """
         Args:
@@ -471,47 +611,30 @@ class VoxMeshDepthHead(VoxMeshMultiViewHead):
         num_views = imgs.shape[1]
         device = imgs.device
 
-        if self.rgb_cnn is not None:
-            # features shape: (B*V, C, H, W)
-            img_feats = self.rgb_cnn(imgs.view(-1, *(imgs.shape[2:])))
-        else:
-            img_feats = []
-
-        depths, depth_feats = self.predict_depths(imgs, masks, extrinsics, **kwargs)
-        masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
-        masked_depths = depths * masks_resized
-
-        # merge RGB and depth features
-        if img_feats:
-            rgbd_feats = [
-                torch.cat((i, j), dim=1) for i, j in zip(img_feats, depth_feats)
-            ]
-        else:
-            rgbd_feats = depth_feats
+        img_feats = self.extract_rgb_features(imgs)
+        depth_feats, depths, masked_depths = self.extract_depth_features(
+            imgs, masks, extrinsics, **kwargs
+        )
+        rgbd_feats = self.merge_rgbd_features(img_feats, depth_feats)
 
         voxel_scores = self.voxel_head(rgbd_feats[-1])
-        # unflatten the batch and views
-        voxel_scores = voxel_scores.view(
-            batch_size, num_views, *(voxel_scores.shape[1:])
-        )
-        rgbd_feats = [
-            i.view(batch_size, num_views, *(i.shape[1:])) for i in rgbd_feats
-        ]
-        if img_feats:
-            img_feats = [
-                i.view(batch_size, num_views, *(i.shape[1:])) for i in img_feats
-            ]
+        voxel_scores, rgbd_feats, img_feats \
+            = self.unflatten_features_batch_views(
+                batch_size, num_views, voxel_scores, rgbd_feats, img_feats
+            )
 
-        K = self._get_projection_matrix(batch_size, device)
-        rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
-        P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
-        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
-            voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
-            # logit score that makes a cell non-occupied
-            self.cubify_threshold_logit - 1e-1
-        )
-        # separate views into list items
-        voxel_scores = voxel_scores.unbind(1)
+        if self.single_view_voxel_prediction:
+            merged_voxel_scores = voxel_scores[:, 0]
+            transformed_voxel_scores = merged_voxel_scores
+            voxel_scores = [voxel_scores[:, 0]]
+        else:
+            merged_voxel_scores, transformed_voxel_scores \
+                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
+            # separate views into list items
+            voxel_scores = voxel_scores.unbind(1)
+
+        rel_extrinsics, P \
+            = self.process_extrinsics(extrinsics, batch_size, device)
 
         if self.contrastive_depth_input:
             def feats_extractor(*args, **kwargs):
