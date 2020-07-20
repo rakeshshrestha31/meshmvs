@@ -322,15 +322,15 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
         merged_vox_mesh = cubify(
             merged_voxel_scores, module.voxel_size, module.cubify_threshold
         )
-        transformed_vox_mesh = [cubify(
-            i, module.voxel_size, module.cubify_threshold
-        ) for i in transformed_voxel_scores]
+        # transformed_vox_mesh = [cubify(
+        #     i, module.voxel_size, module.cubify_threshold
+        # ) for i in transformed_voxel_scores]
         vox_meshes = {
             "merged": merged_vox_mesh,
-            **{
-                "vox_%d" % i: mesh
-                for i, mesh in enumerate(transformed_vox_mesh)
-            }
+            # **{
+            #     "vox_%d" % i: mesh
+            #     for i, mesh in enumerate(transformed_vox_mesh)
+            # }
         }
 
         gt_mesh = batch["meshes"].scale_verts(0.57)
