@@ -318,29 +318,36 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
             for k, v in cur_metrics.items():
                 metrics["final_" + k].append(v)
 
-        # cubify all the voxel scores
-        merged_vox_mesh = cubify(
-            merged_voxel_scores, module.voxel_size, module.cubify_threshold
+        voxel_losses = MeshLoss.voxel_loss(
+            voxel_scores, merged_voxel_scores, batch["voxels"]
         )
-        # transformed_vox_mesh = [cubify(
-        #     i, module.voxel_size, module.cubify_threshold
-        # ) for i in transformed_voxel_scores]
-        vox_meshes = {
-            "merged": merged_vox_mesh,
-            # **{
-            #     "vox_%d" % i: mesh
-            #     for i, mesh in enumerate(transformed_vox_mesh)
-            # }
-        }
-
-        gt_mesh = batch["meshes"].scale_verts(0.57)
-        gt_points = sample_points_from_meshes(
-            gt_mesh, 9000, return_normals=False
-        )
-        gt_points = gt_points.cpu().detach().numpy()
+        # to get metric negate loss
+        for k, v in voxel_losses.items():
+            metrics[k].append(-v.detach().item())
 
         # save meshes
         if prediction_dir is not None:
+            # cubify all the voxel scores
+            merged_vox_mesh = cubify(
+                merged_voxel_scores, module.voxel_size, module.cubify_threshold
+            )
+            # transformed_vox_mesh = [cubify(
+            #     i, module.voxel_size, module.cubify_threshold
+            # ) for i in transformed_voxel_scores]
+            vox_meshes = {
+                "merged": merged_vox_mesh,
+                # **{
+                #     "vox_%d" % i: mesh
+                #     for i, mesh in enumerate(transformed_vox_mesh)
+                # }
+            }
+
+            gt_mesh = batch["meshes"].scale_verts(0.57)
+            gt_points = sample_points_from_meshes(
+                gt_mesh, 9000, return_normals=False
+            )
+            gt_points = gt_points.cpu().detach().numpy()
+
             for mesh_idx in range(len(batch["id_strs"])):
                 label, label_appendix \
                         = batch["id_strs"][mesh_idx].split("-")[:2]
@@ -361,29 +368,23 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
                     pred_points = sample_points_from_meshes(
                         pred_mesh, 6466, return_normals=False
                     )
-                    pred_points = pred_points.cpu().detach().numpy()
+                    pred_points = pred_points.squeeze(0).cpu() \
+                                             .detach().numpy()
 
-                    np.savetxt(pred_filename, pred_points[mesh_idx])
+                    np.savetxt(pred_filename, pred_points)
                     np.savetxt(gt_filename, gt_points[mesh_idx])
 
-        # find accuracy of each cubified voxel meshes
-        for prefix, vox_mesh in vox_meshes.items():
-            vox_mesh_metrics = compare_meshes(
-                vox_mesh, batch["meshes"],
-                scale=0.57, thresholds=[0.01, 0.014142]
-            )
+            # find accuracy of each cubified voxel meshes
+            for prefix, vox_mesh in vox_meshes.items():
+                vox_mesh_metrics = compare_meshes(
+                    vox_mesh, batch["meshes"],
+                    scale=0.57, thresholds=[0.01, 0.014142]
+                )
 
-            if vox_mesh_metrics is None:
-                continue
-            for k, v in vox_mesh_metrics.items():
-                metrics[prefix + "_" + k].append(v)
-
-        voxel_losses = MeshLoss.voxel_loss(
-            voxel_scores, merged_voxel_scores, batch["voxels"]
-        )
-        # to get metric negate loss
-        for k, v in voxel_losses.items():
-            metrics[k].append(-v.item())
+                if vox_mesh_metrics is None:
+                    continue
+                for k, v in vox_mesh_metrics.items():
+                    metrics[prefix + "_" + k].append(v)
 
     # Average numeric metrics, and concatenate images
     metrics = {k: np.mean(v) for k, v in metrics.items()}
