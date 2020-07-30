@@ -94,6 +94,8 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         nn.Module.__init__(self)
 
         self.setup(cfg)
+        self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
+
         # backbone
         self.backbone, feat_dims = build_backbone(cfg.MODEL.BACKBONE)
         # voxel head
@@ -210,6 +212,36 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         fusion_weights = torch.stack(fusion_weights, dim=0)
         return fused_features, fusion_weights
 
+    def process_extrinsics(self, extrinsics, batch_size, device):
+        K = self._get_projection_matrix(batch_size, device)
+        rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
+        P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
+        return rel_extrinsics, P
+
+    def merge_multi_view_voxel_scores(
+        self, voxel_scores, extrinsics
+    ):
+        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
+            voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
+            # logit score that makes a cell non-occupied
+            self.cubify_threshold_logit - 1e-1
+        )
+        return merged_voxel_scores, transformed_voxel_scores
+
+    def get_merged_voxel_scores(self, voxel_scores, extrinsics):
+        """Note: mutates voxel_scores (converts tensor to list of tensors
+        """
+        if self.single_view_voxel_prediction:
+            merged_voxel_scores = voxel_scores[:, 0]
+            transformed_voxel_scores = merged_voxel_scores
+            voxel_scores = [voxel_scores[:, 0]]
+        else:
+            merged_voxel_scores, transformed_voxel_scores \
+                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
+            # separate views into list items
+            voxel_scores = voxel_scores.unbind(1)
+        return merged_voxel_scores, transformed_voxel_scores, voxel_scores
+
     def forward(self, imgs, intrinsics, extrinsics, voxel_only=False):
         """
         Args:
@@ -240,16 +272,11 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         # timestamp = int(time.time() * 1000)
         # save_images(imgs, timestamp)
 
-        K = self._get_projection_matrix(batch_size, device)
-        rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
-        P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
-        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
-            voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
-            # logit score that makes a cell non-occupied
-            self.cubify_threshold_logit - 1e-1
-        )
-        # separate views into list items
-        voxel_scores = voxel_scores.unbind(1)
+        merged_voxel_scores, transformed_voxel_scores, voxel_scores = \
+            self.get_merged_voxel_scores(voxel_scores, extrinsics)
+
+        rel_extrinsics, P \
+            = self.process_extrinsics(extrinsics, batch_size, device)
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
@@ -411,22 +438,6 @@ class VoxDepthHead(VoxMeshMultiViewHead):
             ]
         return voxel_scores, rgbd_feats, img_feats
 
-    def process_extrinsics(self, extrinsics, batch_size, device):
-        K = self._get_projection_matrix(batch_size, device)
-        rel_extrinsics = relative_extrinsics(extrinsics, extrinsics[:, 0])
-        P = [K.bmm(T) for T in rel_extrinsics.unbind(dim=1)]
-        return rel_extrinsics, P
-
-    def merge_multi_view_voxel_scores(
-        self, voxel_scores, extrinsics
-    ):
-        merged_voxel_scores, transformed_voxel_scores = merge_multi_view_voxels(
-            voxel_scores, extrinsics, self.voxel_size, self.cubify_threshold,
-            # logit score that makes a cell non-occupied
-            self.cubify_threshold_logit - 1e-1
-        )
-        return merged_voxel_scores, transformed_voxel_scores
-
     def forward(
         self, imgs, intrinsics, extrinsics, masks,
         voxel_only=False, **kwargs
@@ -452,16 +463,8 @@ class VoxDepthHead(VoxMeshMultiViewHead):
             = self.unflatten_features_batch_views(
                 batch_size, num_views, voxel_scores, rgbd_feats, img_feats
             )
-
-        if self.single_view_voxel_prediction:
-            merged_voxel_scores = voxel_scores[:, 0]
-            transformed_voxel_scores = merged_voxel_scores
-            voxel_scores = [voxel_scores[:, 0]]
-        else:
-            merged_voxel_scores, transformed_voxel_scores \
-                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
-            # separate views into list items
-            voxel_scores = voxel_scores.unbind(1)
+        merged_voxel_scores, transformed_voxel_scores, voxel_scores = \
+            self.get_merged_voxel_scores(voxel_scores, extrinsics)
 
         return {
             "voxel_scores": voxel_scores,
@@ -623,15 +626,8 @@ class VoxMeshDepthHead(VoxDepthHead):
                 batch_size, num_views, voxel_scores, rgbd_feats, img_feats
             )
 
-        if self.single_view_voxel_prediction:
-            merged_voxel_scores = voxel_scores[:, 0]
-            transformed_voxel_scores = merged_voxel_scores
-            voxel_scores = [voxel_scores[:, 0]]
-        else:
-            merged_voxel_scores, transformed_voxel_scores \
-                = self.merge_multi_view_voxel_scores(voxel_scores, extrinsics)
-            # separate views into list items
-            voxel_scores = voxel_scores.unbind(1)
+        merged_voxel_scores, transformed_voxel_scores, voxel_scores = \
+            self.get_merged_voxel_scores(voxel_scores, extrinsics)
 
         rel_extrinsics, P \
             = self.process_extrinsics(extrinsics, batch_size, device)
