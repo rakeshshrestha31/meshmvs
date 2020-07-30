@@ -16,7 +16,8 @@ import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
 from shapenet.modeling.mesh_arch import \
     VoxMeshMultiViewHead, VoxMeshDepthHead, VoxDepthHead
-from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
+from shapenet.modeling.heads.depth_loss import \
+    adaptive_berhu_loss, interpolate_multi_view_tensor
 from shapenet.modeling.heads.mesh_loss import MeshLoss
 from shapenet.modeling.mesh_arch import cubify
 
@@ -407,6 +408,8 @@ def evaluate_split_depth(
     device = torch.device("cuda:0")
     num_predictions = 0
     num_predictions_kept = 0
+    total_l1_err = 0.0
+    num_pixels = 0.0
     predictions = defaultdict(list)
     metrics = defaultdict(list)
     deprocess = imagenet_deprocess(rescale_image=False)
@@ -422,6 +425,17 @@ def evaluate_split_depth(
         loss = adaptive_berhu_loss(
             batch["depths"], pred_depths, batch["masks"]
         ).item()
+
+        depth_gt = interpolate_multi_view_tensor(
+            batch["depths"], pred_depths.shape[-2:]
+        )
+        mask = interpolate_multi_view_tensor(
+            batch["masks"], pred_depths.shape[-2:]
+        )
+        masked_pred_depths = pred_depths * mask
+        total_l1_err += \
+                torch.sum(torch.abs(masked_pred_depths - depth_gt)).item()
+        num_pixels += torch.sum(mask).item()
         cur_metrics = {"depth_loss": loss, "negative_depth_loss": -loss}
 
         if cur_metrics is None:
@@ -445,7 +459,10 @@ def evaluate_split_depth(
                 predictions["%sdepth_pred" % prefix].append(pred_depth)
 
         num_predictions += len(batch["imgs"])
-        logger.info("Evaluated %d predictions so far" % num_predictions)
+        logger.info(
+            "Evaluated %d predictions so far: avg err: %f" \
+                    % (num_predictions, total_l1_err / num_pixels)
+        )
         if 0 < max_predictions <= num_predictions:
             break
 

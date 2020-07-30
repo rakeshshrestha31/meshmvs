@@ -66,15 +66,20 @@ def main_worker_eval(worker_id, args):
     logger.info("Loading model from checkpoint: %s" % (cfg.MODEL.CHECKPOINT))
     cp = torch.load(PathManager.get_local_path(cfg.MODEL.CHECKPOINT))
     state_dict = clean_state_dict(cp["best_states"]["model"])
-    model = build_model(cfg)
+    model = MVSNet(cfg.MODEL.MVSNET)
     model.load_state_dict(state_dict)
     logger.info("Model loaded")
     model.to(device)
 
-    if args.eval_p2m:
-        evaluate_test_p2m(model, test_loader)
-    else:
-        evaluate_test(model, test_loader)
+    eval_split = 'test'
+    test_metrics, test_preds = evaluate_split_depth(
+        model, test_loader, prefix="%s_" % eval_split
+    )
+
+    str_out = "Results on %s: " % eval_split
+    for k, v in test_metrics.items():
+        str_out += "%s %.4f " % (k, v)
+    logger.info(str_out)
 
 
 def main_worker(worker_id, args):
