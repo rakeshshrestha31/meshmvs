@@ -77,14 +77,15 @@ class MeshVoxMultiViewDataset(MeshVoxDataset):
     def __getitem__(self, idx):
         sid = self.synset_ids[idx]
         mid = self.model_ids[idx]
-        ref_iid = self.image_ids[0]
+        image_ids = self.image_ids["%s_%s" % (sid, mid)]
+        ref_iid = image_ids[0]
 
         metadata = self.read_camera_parameters(self.data_dir, sid, mid)
         K = metadata["intrinsic"]
 
         imgs = []
         extrinsics = []
-        for iid in self.image_ids:
+        for iid in image_ids:
             img_path = metadata["image_list"][iid]
             img = self.read_image(self.data_dir, sid, mid, img_path)
             img = self.transform(img)

@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+import os
 import json
 import logging
 import torch
@@ -64,14 +65,16 @@ def build_data_loader(
     if dataset == "MeshVox":
         dset = MeshVoxDataset(**dataset_args)
         collate_fn = MeshVoxDataset.collate_fn
-    elif dataset == "MeshVoxMultiView":
-        dataset_args["input_views"] = cfg.DATASETS.INPUT_VIEWS
-        dset = MeshVoxMultiViewDataset(**dataset_args)
-        collate_fn = MeshVoxMultiViewDataset.collate_fn
-    elif dataset == "MeshVoxDepth":
-        dataset_args["input_views"] = cfg.DATASETS.INPUT_VIEWS
-        dset = MeshVoxDepthDataset(**dataset_args)
-        collate_fn = MeshVoxDepthDataset.collate_fn
+    elif dataset in ["MeshVoxMultiView", "MeshVoxDepth"]:
+        input_views_file = os.path.join(
+            os.path.dirname(cfg.DATASETS.SPLITS_FILE), "best_subsets.json"
+        )
+        with open(input_views_file, 'r') as f:
+            dataset_args["input_views"] = json.load(f)
+        dataset_object = MeshVoxMultiViewDataset \
+            if dataset == "MeshVoxMultiView" else MeshVoxDepthDataset
+        dset = dataset_object(**dataset_args)
+        collate_fn = dataset_object.collate_fn
     else:
         raise ValueError("Dataset %s not registered" % dataset)
 

@@ -74,11 +74,12 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
     def __getitem__(self, idx):
         sid = self.synset_ids[idx]
         mid = self.model_ids[idx]
+        image_ids = self.image_ids["%s_%s" % (sid, mid)]
         metadata = self.read_camera_parameters(self.data_dir, sid, mid)
 
         depths = []
         masks = []
-        for iid in self.image_ids:
+        for iid in image_ids:
             img_path = metadata["image_list"][iid]
             depths.append(self.read_depth(self.data_dir, sid, mid, iid))
             masks.append(self.read_mask(self.data_dir, sid, mid, img_path))
@@ -97,10 +98,10 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
                 self.transform(self.read_image(
                     self.data_dir, sid, mid, metadata["image_list"][iid]
                 ))
-                for iid in self.image_ids
+                for iid in image_ids
             ], dim=0)
             extrinsics = torch.stack(
-                [metadata["extrinsics"][iid] for iid in self.image_ids], dim=0
+                [metadata["extrinsics"][iid] for iid in image_ids], dim=0
             )
             return {
                 "depths": depths, "masks": masks, "imgs": imgs,
