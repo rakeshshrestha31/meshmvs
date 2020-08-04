@@ -310,6 +310,10 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         )
                         losses["rendered_gt_depth_loss_%d" % depth_idx] \
                                 = rendered_gt_depth_loss
+                        if not torch.any(torch.isnan(rendered_gt_depth_loss)):
+                            loss = loss \
+                                 + (rendered_gt_depth_loss \
+                                    * cfg.MODEL.MVSNET.RENDERED_VS_GT_DEPTH_WEIGHT)
 
             if model_kwargs.get("voxel_only", False):
                 for k, v in losses.items():

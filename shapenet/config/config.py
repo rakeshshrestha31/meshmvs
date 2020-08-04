@@ -90,6 +90,7 @@ def get_shapenet_cfg():
     # loss weights
     cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT = 0.1
     cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT = 0.00
+    cfg.MODEL.MVSNET.RENDERED_VS_GT_DEPTH_WEIGHT = 0.00
 
     # ------------------------------------------------------------------------ #
     # Solver
