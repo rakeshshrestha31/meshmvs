@@ -672,11 +672,11 @@ class VoxMeshDepthHead(VoxDepthHead):
 
         rendered_depths = [i["rendered_depths"] for i in mesh_features]
         # add rendered depth of the final mesh
-        rendered_depths.append(self.depth_renderer(
-            refined_meshes[-1].verts_padded(),
-            refined_meshes[-1].faces_padded(),
-            rel_extrinsics, self.mvsnet_image_size
-        ))
+        # rendered_depths.append(self.depth_renderer(
+        #     refined_meshes[-1].verts_padded(),
+        #     refined_meshes[-1].faces_padded(),
+        #     rel_extrinsics, self.mvsnet_image_size
+        # ))
 
         # debug only
         # timestamp = int(time.time() * 1000)
