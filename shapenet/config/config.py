@@ -91,6 +91,16 @@ def get_shapenet_cfg():
     cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT = 0.1
     cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT = 0.00
     cfg.MODEL.MVSNET.RENDERED_VS_GT_DEPTH_WEIGHT = 0.00
+    cfg.MODEL.MVSNET.USE_FINAL_RENDERED_DEPTH_LOSS = False
+
+    # perceptual loss
+    cfg.MODEL.PERCEPTUAL_LOSS = CN()
+    cfg.MODEL.PERCEPTUAL_LOSS.CONTENT_IMAGE = "gt_depth"
+    cfg.MODEL.PERCEPTUAL_LOSS.STYLE_IMAGE = "predicted_depth"
+    cfg.MODEL.PERCEPTUAL_LOSS.CONTENT_LOSS_WEIGHT = 0.0
+    cfg.MODEL.PERCEPTUAL_LOSS.STYLE_LOSS_WEIGHT = 0.0
+    cfg.MODEL.PERCEPTUAL_LOSS.USE_FINAL_RENDERED_DEPTH = False
+    cfg.MODEL.PERCEPTUAL_LOSS.RETRAIN = False
 
     # ------------------------------------------------------------------------ #
     # Solver

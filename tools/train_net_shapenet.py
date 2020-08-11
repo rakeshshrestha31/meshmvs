@@ -28,6 +28,8 @@ from shapenet.evaluation import \
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
 from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
+from shapenet.modeling.heads.perceptual_loss import \
+        PerceptualLoss, get_perceptual_losses
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
@@ -179,6 +181,11 @@ def main_worker(worker_id, args):
     }
     loss_fn = MeshLoss(**loss_fn_kwargs)
 
+    perceptual_loss = PerceptualLoss(
+        requires_grad=cfg.MODEL.PERCEPTUAL_LOSS.RETRAIN
+    )
+    perceptual_loss.to(device)
+
     checkpoint_path = "checkpoint.pt"
     checkpoint_path = os.path.join(cfg.OUTPUT_DIR, checkpoint_path)
     cp = Checkpoint(checkpoint_path)
@@ -192,10 +199,16 @@ def main_worker(worker_id, args):
         optimizer.load_state_dict(cp.latest_states["optim"])
         scheduler.load_state_dict(cp.latest_states["lr_scheduler"])
 
-    training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn)
+    training_loop(
+        cfg, cp, model, optimizer, scheduler, loaders,
+        device, loss_fn, perceptual_loss
+    )
 
 
-def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn):
+def training_loop(
+        cfg, cp, model, optimizer, scheduler, loaders,
+        device, loss_fn, perceptual_loss
+):
     Timer.timing = False
     iteration_timer = Timer("Iteration")
 
@@ -267,12 +280,9 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     (batch["points"], batch["normals"])
                 )
 
-            skip = loss is None
-            if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:
-                logger.info("WARNING: Got non-finite loss %f" % loss)
-                skip = True
             # depth losses
-            elif "depths" in batch:
+            # TODO: refactor this into a function
+            if "depths" in batch:
                 if "pred_depths" in model_outputs:
                     depth_loss = adaptive_berhu_loss(
                         batch["depths"], model_outputs["pred_depths"],
@@ -301,19 +311,47 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                             loss = loss \
                                  + (rendered_depth_loss \
                                     * cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT)
+                        # rendered vs predicted depth loss
                         losses["rendered_depth_loss_%d" % depth_idx] \
                                 = rendered_depth_loss
 
-                        # rendered vs GT depth loss, only for debug
+                        # rendered vs GT depth loss
                         rendered_gt_depth_loss = adaptive_berhu_loss(
                             batch["depths"], rendered_depth, all_ones_masks
                         )
                         losses["rendered_gt_depth_loss_%d" % depth_idx] \
                                 = rendered_gt_depth_loss
-                        if not torch.any(torch.isnan(rendered_gt_depth_loss)):
+                        if not torch.any(torch.isnan(rendered_gt_depth_loss)) \
+                                and (depth_idx < 3 \
+                                        or cfg.MODEL.MVSNET.USE_FINAL_RENDERED_DEPTH_LOSS):
                             loss = loss \
                                  + (rendered_gt_depth_loss \
                                     * cfg.MODEL.MVSNET.RENDERED_VS_GT_DEPTH_WEIGHT)
+
+                        # perceptual losses
+                        perceptual_losses = get_perceptual_losses(
+                            cfg.MODEL.PERCEPTUAL_LOSS, perceptual_loss,
+                            rendered_depth, masked_depths, batch["depths"]
+                        )
+                        if perceptual_losses is not None:
+                            losses["perceptual_content_loss_%d" % depth_idx] \
+                                    = perceptual_losses["loss_content"]
+                            losses["perceptual_style_loss_%d" % depth_idx] \
+                                    = perceptual_losses["loss_style"]
+
+                            if depth_idx < 3 \
+                                    or cfg.MODEL.PERCEPTUAL_LOSS.USE_FINAL_RENDERED_DEPTH:
+                                loss = loss \
+                                     + (perceptual_losses["loss_content"] \
+                                            * cfg.MODEL.PERCEPTUAL_LOSS.CONTENT_LOSS_WEIGHT)
+                                loss = loss \
+                                     + (perceptual_losses["loss_style"] \
+                                            * cfg.MODEL.PERCEPTUAL_LOSS.STYLE_LOSS_WEIGHT)
+
+            skip = loss is None
+            if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:
+                logger.info("WARNING: Got non-finite loss %f" % loss)
+                skip = True
 
             if model_kwargs.get("voxel_only", False):
                 for k, v in losses.items():
