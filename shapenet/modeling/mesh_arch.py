@@ -364,6 +364,7 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         - depths: tensor of shape (B, V, H, W)
         - depth features: list of tenosrs of shape (B*V, C, H, W)
         """
+        img_size = self.mvsnet_image_size.tolist()
         # flatten batch/size and add channel dimension: (B*V, 1, H, W)
         def interpolate(tensor, size):
             """ (B, V, H1, W1) -> (B*V, 1, H1, W1)
@@ -384,8 +385,8 @@ class VoxDepthHead(VoxMeshMultiViewHead):
                 exit(1)
         else:
             mvsnet_output = self.mvsnet(imgs, extrinsics)
-        depths = interpolate(mvsnet_output["depths"], imgs.shape[-2:])
-        masks = interpolate(masks, imgs.shape[-2:])
+        depths = interpolate(mvsnet_output["depths"], img_size)
+        masks = interpolate(masks, img_size)
         depths = depths * masks
 
         # features shape: (B*V, C, H, W)
@@ -481,7 +482,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         VoxMeshMultiViewHead.setup(self, cfg)
 
         self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
-        self.contrastive_depth_input = cfg.MODEL.CONTRASTIVE_DEPTH_INPUT
+        self.contrastive_depth_type = cfg.MODEL.CONTRASTIVE_DEPTH_TYPE
         self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
 
         self.mvsnet = MVSNet(cfg.MODEL.MVSNET) if not cfg.MODEL.USE_GT_DEPTH \
@@ -495,13 +496,24 @@ class VoxMeshDepthHead(VoxDepthHead):
         self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
             = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
 
-        if self.contrastive_depth_input:
+        if self.contrastive_depth_type == 'input_concat':
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 2)
-        else:
+        elif self.contrastive_depth_type == 'feature_concat':
             # can reuse same features used for voxel prediction
-            # self.post_voxel_depth_cnn = self.pre_voxel_depth_cnn
+            # Twice the features from predicted and rendered depths
+            post_voxel_depth_feat_dims = [i * 2 for i in pre_voxel_depth_feat_dims]
+        elif self.contrastive_depth_type == 'feature_diff':
+            # can reuse same features used for voxel prediction
             post_voxel_depth_feat_dims = pre_voxel_depth_feat_dims
+        elif self.contrastive_depth_type == 'none':
+            # can reuse same features used for voxel prediction
+            post_voxel_depth_feat_dims = pre_voxel_depth_feat_dims
+        else:
+            print(
+                'Unrecognized contrastive depth type:', self.contrastive_depth_type
+            )
+            exit(1)
 
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
@@ -542,6 +554,7 @@ class VoxMeshDepthHead(VoxDepthHead):
     ):
         """
         returns rgbd features regardless of the meshes
+                (without contrastive features but adds rendered_depths)
 
         Args:
         - meshes (Meshes)
@@ -564,11 +577,11 @@ class VoxMeshDepthHead(VoxDepthHead):
             "rendered_depths": rendered_depths
         }
 
-    def extract_contrastive_features(
-        self, meshes, pred_depths, extrinsics
+    def extract_contrastive_input_concat_features(
+        self, meshes, rgb_feats, pred_depths, extrinsics
     ):
         """
-        contrastive depth feature extractor
+        contrastive depth feature extractor using input_concat
 
         Args:
         - meshes (Meshes)
@@ -593,15 +606,140 @@ class VoxMeshDepthHead(VoxDepthHead):
         contrastive_input = contrastive_input \
                                 .view(-1, *(contrastive_input.shape[2:]))
         # list of (B*V, C, H, W)
-        feats = self.post_voxel_depth_cnn(contrastive_input)
+        contrastive_feats = self.post_voxel_depth_cnn(contrastive_input)
         # unflatten batch/views: (B, V, C, H, W)
-        feats = [
-            i.view(batch_size, num_views, *(i.shape[1:])) for  i in feats
+        contrastive_feats = [
+            i.view(batch_size, num_views, *(i.shape[1:]))
+            for i in contrastive_feats
         ]
         return {
-            "img_feats": feats,
+            "img_feats": contrastive_feats + rgb_feats,
             "rendered_depths": rendered_depths
         }
+
+    def extract_contrastive_feature_concat_features(
+        self, meshes, rgb_feats, pred_depth_feats, extrinsics
+    ):
+        """
+        contrastive depth feature extractor using feature_concat
+
+        Args:
+        - meshes (Meshes)
+        - pred_depths (tensor): shape (B, V, H, W)
+        - extrinsics (list of tensors): list of (B, 4, 4) transformations
+        Returns:
+        - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                              or a list of such tensors.
+        - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        # (B, V, H, W)
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+        batch_size, num_views = rendered_depths.shape[:2]
+
+        # (B*V, 1, H, W)
+        rendered_depths_reshaped = rendered_depths.view(-1, 1, *rendered_depths.shape[2:])
+
+        # list of (B*V, C, H, W)
+        rendered_depth_feats = self.pre_voxel_depth_cnn(rendered_depths_reshaped)
+
+        # list of (B*V, 2*C, H, W)
+        contrastive_feats = [
+            torch.cat((i, j), axis=1)
+            for i, j in zip(pred_depth_feats, rendered_depth_feats)
+        ]
+
+        # unflatten batch/views: (B, V, C, H, W)
+        contrastive_feats = [
+            i.view(batch_size, num_views, *(i.shape[1:]))
+            for i in contrastive_feats
+        ]
+
+        return {
+            "img_feats": contrastive_feats + rgb_feats,
+            "rendered_depths": rendered_depths
+        }
+
+    def extract_contrastive_feature_diff_features(
+        self, meshes, rgb_feats, pred_depth_feats, extrinsics
+    ):
+        """
+        contrastive depth feature extractor using feature_concat
+
+        Args:
+        - meshes (Meshes)
+        - pred_depths (tensor): shape (B, V, H, W)
+        - extrinsics (list of tensors): list of (B, 4, 4) transformations
+        Returns:
+        - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                              or a list of such tensors.
+        - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        # (B, V, H, W)
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+        batch_size, num_views = rendered_depths.shape[:2]
+
+        # (B*V, 1, H, W)
+        rendered_depths_reshaped = rendered_depths.view(-1, 1, *rendered_depths.shape[2:])
+
+        # list of (B*V, C, H, W)
+        rendered_depth_feats = self.pre_voxel_depth_cnn(rendered_depths_reshaped)
+
+        contrastive_feats = [
+            i - j
+            for i, j in zip(pred_depth_feats, rendered_depth_feats)
+        ]
+
+        # unflatten batch/views: (B, V, C, H, W)
+        contrastive_feats = [
+            i.view(batch_size, num_views, *(i.shape[1:]))
+            for i in contrastive_feats
+        ]
+
+        return {
+            "img_feats": contrastive_feats + rgb_feats,
+            "rendered_depths": rendered_depths
+        }
+
+    def get_features_extractor(
+            self, rgb_feats, depth_feats, rgbd_feats, pred_depths, rel_extrinsics
+    ):
+        """get features extractor for mesh head
+           based on self.contrastive_depth_type
+        """
+        if self.contrastive_depth_type == 'input_concat':
+            return functools.partial(
+                self.extract_contrastive_input_concat_features,
+                rgb_feats=rgb_feats, pred_depths=pred_depths,
+                extrinsics=rel_extrinsics
+            )
+        elif self.contrastive_depth_type == 'feature_concat':
+            return functools.partial(
+                self.extract_contrastive_feature_concat_features,
+                rgb_feats=rgb_feats, pred_depth_feats=depth_feats,
+                extrinsics=rel_extrinsics
+            )
+        elif self.contrastive_depth_type == 'feature_diff':
+            return functools.partial(
+                self.extract_contrastive_feature_diff_features,
+                rgb_feats=rgb_feats, pred_depth_feats=depth_feats,
+                extrinsics=rel_extrinsics
+            )
+        elif self.contrastive_depth_type == 'none':
+            return functools.partial(
+                self.extract_rgbd_features, rgbd_feats=rgbd_feats,
+                extrinsics=rel_extrinsics
+            )
+        else:
+            print(
+                'Unrecognized contrastive depth type:', self.contrastive_depth_type
+            )
+            exit(1)
 
     def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
         """
@@ -632,21 +770,9 @@ class VoxMeshDepthHead(VoxDepthHead):
         rel_extrinsics, P \
             = self.process_extrinsics(extrinsics, batch_size, device)
 
-        if self.contrastive_depth_input:
-            def feats_extractor(*args, **kwargs):
-                nonlocal masked_depths, rel_extrinsics
-                feats = self.extract_contrastive_features(
-                    *args, **kwargs,
-                    pred_depths=masked_depths, extrinsics=rel_extrinsics,
-                )
-                feats["img_feats"] += img_feats
-                return feats
-            # add image features
-        else:
-            feats_extractor = functools.partial(
-                self.extract_rgbd_features, rgbd_feats=rgbd_feats,
-                extrinsics=rel_extrinsics
-            )
+        feats_extractor = self.get_features_extractor(
+            img_feats, depth_feats, rgbd_feats, masked_depths, rel_extrinsics
+        )
 
         if voxel_only:
             dummy_meshes = dummy_mesh(batch_size, device)
