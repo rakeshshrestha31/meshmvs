@@ -15,7 +15,7 @@ def get_shapenet_cfg():
     cfg.MODEL.DEPTH_BACKBONE = "resnet50"
     cfg.MODEL.VOXEL_ON = False
     cfg.MODEL.MESH_ON = False
-    # options: none | input_concat | feature_concat | feature_diff
+    # options: none | input_concat | input_diff | feature_concat | feature_diff
     cfg.MODEL.CONTRASTIVE_DEPTH_TYPE = "none"
     cfg.MODEL.RGB_FEATURES_INPUT = False
     cfg.MODEL.USE_GT_DEPTH = False

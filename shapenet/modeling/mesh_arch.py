@@ -499,6 +499,9 @@ class VoxMeshDepthHead(VoxDepthHead):
         if self.contrastive_depth_type == 'input_concat':
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 2)
+        elif self.contrastive_depth_type == 'input_diff':
+            self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
+                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
         elif self.contrastive_depth_type == 'feature_concat':
             # can reuse same features used for voxel prediction
             # Twice the features from predicted and rendered depths
@@ -617,6 +620,46 @@ class VoxMeshDepthHead(VoxDepthHead):
             "rendered_depths": rendered_depths
         }
 
+    def extract_contrastive_input_diff_features(
+        self, meshes, rgb_feats, pred_depths, extrinsics
+    ):
+        """
+        contrastive depth feature extractor using input_diff
+
+        Args:
+        - meshes (Meshes)
+        - pred_depths (tensor): shape (B, V, H, W)
+        - extrinsics (list of tensors): list of (B, 4, 4) transformations
+        Returns:
+        - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                              or a list of such tensors.
+        - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        batch_size, num_views = pred_depths.shape[:2]
+        # (B, V, H, W)
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+        pred_depths = F.interpolate(
+            pred_depths, rendered_depths.shape[-2:], mode="nearest"
+        )
+        contrastive_input = pred_depths - rendered_depths
+        # flattened batch/views (BxV, 1, H, W)
+        contrastive_input = contrastive_input \
+                                .view(-1, 1, *(contrastive_input.shape[2:]))
+        # list of (B*V, C, H, W)
+        contrastive_feats = self.post_voxel_depth_cnn(contrastive_input)
+        # unflatten batch/views: (B, V, C, H, W)
+        contrastive_feats = [
+            i.view(batch_size, num_views, *(i.shape[1:]))
+            for i in contrastive_feats
+        ]
+        return {
+            "img_feats": contrastive_feats + rgb_feats,
+            "rendered_depths": rendered_depths
+        }
+
     def extract_contrastive_feature_concat_features(
         self, meshes, rgb_feats, pred_depth_feats, extrinsics
     ):
@@ -715,6 +758,12 @@ class VoxMeshDepthHead(VoxDepthHead):
         if self.contrastive_depth_type == 'input_concat':
             return functools.partial(
                 self.extract_contrastive_input_concat_features,
+                rgb_feats=rgb_feats, pred_depths=pred_depths,
+                extrinsics=rel_extrinsics
+            )
+        elif self.contrastive_depth_type == 'input_diff':
+            return functools.partial(
+                self.extract_contrastive_input_diff_features,
                 rgb_feats=rgb_feats, pred_depths=pred_depths,
                 extrinsics=rel_extrinsics
             )
