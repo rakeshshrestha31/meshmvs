@@ -399,8 +399,12 @@ class VoxDepthHead(VoxMeshMultiViewHead):
 
     def extract_rgb_features(self, imgs):
         if self.rgb_cnn is not None:
+            img_size = self.mvsnet_image_size.tolist()
+            # (B*V, C, H, W)
+            imgs = imgs.view(-1, *(imgs.shape[2:]))
+            imgs = F.interpolate(imgs, img_size, mode="bilinear")
             # features shape: (B*V, C, H, W)
-            img_feats = self.rgb_cnn(imgs.view(-1, *(imgs.shape[2:])))
+            img_feats = self.rgb_cnn(imgs)
         else:
             img_feats = []
         return img_feats
