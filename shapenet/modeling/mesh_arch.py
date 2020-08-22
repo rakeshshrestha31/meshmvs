@@ -390,7 +390,10 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         depths = depths * masks
 
         # features shape: (B*V, C, H, W)
-        depth_feats = self.pre_voxel_depth_cnn(depths)
+        if hasattr(self, 'pre_voxel_depth_cnn'):
+            depth_feats = self.pre_voxel_depth_cnn(depths)
+        else:
+            depth_feats = None
         batch_size, num_views = mvsnet_output["depths"].shape[:2]
         # (B, V, 1, H, W)
         depths = depths.view(batch_size, num_views, *(depths.shape[-2:]))
@@ -907,10 +910,10 @@ class SphereMeshDepthHead(VoxMeshDepthHead):
         else:
             self.rgb_cnn, rgb_feat_dims = None, [0]
 
-        # there is no real (pre-)voxel stage since initial mesh is a sphere
-        # this is just for compatibility with VoxMeshDepthHead (also used for contrastive depth type None)
-        self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
-            = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+        # Note: there is no real (pre-)voxel stage since initial mesh is a sphere
+        if self.contrastive_depth_type == 'none':
+            self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
         post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
         # depth renderer
         self.depth_renderer = DepthRenderer(cfg)
