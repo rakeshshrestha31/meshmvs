@@ -496,6 +496,44 @@ class VoxMeshDepthHead(VoxDepthHead):
         self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
             = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
 
+        post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
+
+        # voxel head
+        cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
+                rgb_feat_dims[-1] + pre_voxel_depth_feat_dims[-1]
+        self.voxel_head = VoxelHead(cfg)
+
+        # depth renderer
+        self.depth_renderer = DepthRenderer(cfg)
+
+        # multi-view feature fusion
+        prefusion_feat_dims = sum(rgb_feat_dims) \
+                            + sum(post_voxel_depth_feat_dims)
+        postfusion_feat_dims = self.init_feature_fusion(
+            cfg, prefusion_feat_dims
+        )
+
+        # mesh head
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
+        self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
+
+        print({
+            "rgb_feat_dims": rgb_feat_dims,
+            "pre_voxel_depth_feat_dims": pre_voxel_depth_feat_dims,
+            "post_voxel_depth_feat_dims": post_voxel_depth_feat_dims,
+            "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
+            "prefusion_feat_dims": prefusion_feat_dims,
+            "postfusion_feat_dims": postfusion_feat_dims
+        })
+        print("Using GT depth input:", cfg.MODEL.USE_GT_DEPTH)
+
+        if cfg.MODEL.VOXEL_HEAD.FREEZE:
+            self.freeze_voxel_head()
+
+    def init_post_voxel_depth_cnn(self, cfg):
+        """initializes self.post_voxel_depth_cnn
+        Returns: post_voxel_depth_feat_dims
+        """
         if self.contrastive_depth_type == 'input_concat':
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 2)
@@ -521,39 +559,7 @@ class VoxMeshDepthHead(VoxDepthHead):
             )
             exit(1)
 
-        # voxel head
-        cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
-                rgb_feat_dims[-1] + pre_voxel_depth_feat_dims[-1]
-        self.voxel_head = VoxelHead(cfg)
-
-        # depth renderer
-        self.depth_renderer = DepthRenderer(cfg)
-
-        # multi-view feature fusion
-        prefusion_feat_dims = sum(rgb_feat_dims) \
-                            + sum(post_voxel_depth_feat_dims)
-        postfusion_feat_dims = self.init_feature_fusion(
-            cfg, prefusion_feat_dims
-        )
-
-        # mesh head
-        # times 3 cuz multi-view (mean, avg, std) features will be used
-        # TODO: attention-based stuffs
-        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
-        self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
-
-        print({
-            "rgb_feat_dims": rgb_feat_dims,
-            "pre_voxel_depth_feat_dims": pre_voxel_depth_feat_dims,
-            "post_voxel_depth_feat_dims": post_voxel_depth_feat_dims,
-            "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
-            "prefusion_feat_dims": prefusion_feat_dims,
-            "postfusion_feat_dims": postfusion_feat_dims
-        })
-        print("Using GT depth input:", cfg.MODEL.USE_GT_DEPTH)
-
-        if cfg.MODEL.VOXEL_HEAD.FREEZE:
-            self.freeze_voxel_head()
+        return post_voxel_depth_feat_dims
 
     def extract_rgbd_features(
         self, meshes, rgbd_feats, extrinsics
