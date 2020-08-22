@@ -323,8 +323,12 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         else:
             self.rgb_cnn, rgb_feat_dims = None, [0]
 
-        self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
-            = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+        self.use_depth_features_input = cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT
+        if self.use_depth_features_input:
+            self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+        else:
+            pre_voxel_depth_feat_dims = [0]
 
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
@@ -417,16 +421,22 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         depths, depth_feats = self.predict_depths(imgs, masks, extrinsics, **kwargs)
         masks_resized = F.interpolate(masks, depths.shape[-2:], mode="nearest")
         masked_depths = depths * masks_resized
+        if not self.use_depth_features_input:
+            depth_feats = []
         return depth_feats, depths, masked_depths
 
     def merge_rgbd_features(self, img_feats, depth_feats):
         # merge RGB and depth features
-        if img_feats:
+        if img_feats and depth_feats:
             rgbd_feats = [
                 torch.cat((i, j), dim=1) for i, j in zip(img_feats, depth_feats)
             ]
-        else:
+        elif depth_feats:
             rgbd_feats = depth_feats
+        elif img_feats:
+            rgbd_feats = img_feats
+        else:
+            rgbd_feats = None
         return rgbd_feats
 
     @staticmethod
@@ -500,10 +510,14 @@ class VoxMeshDepthHead(VoxDepthHead):
         else:
             self.rgb_cnn, rgb_feat_dims = None, [0]
 
-        self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
-            = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+        self.use_depth_features_input = cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT
+        if self.use_depth_features_input:
+            self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+        else:
+            pre_voxel_depth_feat_dims = [0]
 
-        post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
+        post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg, pre_voxel_depth_feat_dims)
 
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
@@ -537,7 +551,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         if cfg.MODEL.VOXEL_HEAD.FREEZE:
             self.freeze_voxel_head()
 
-    def init_post_voxel_depth_cnn(self, cfg):
+    def init_post_voxel_depth_cnn(self, cfg, pre_voxel_depth_feat_dims):
         """initializes self.post_voxel_depth_cnn
         Returns: post_voxel_depth_feat_dims
         """
@@ -911,10 +925,14 @@ class SphereMeshDepthHead(VoxMeshDepthHead):
             self.rgb_cnn, rgb_feat_dims = None, [0]
 
         # Note: there is no real (pre-)voxel stage since initial mesh is a sphere
+        self.use_depth_features_input = True
         if self.contrastive_depth_type == 'none':
             self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
-        post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
+        else:
+            pre_voxel_depth_feat_dims = [0]
+
+        post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg, pre_voxel_depth_feat_dims)
         # depth renderer
         self.depth_renderer = DepthRenderer(cfg)
 

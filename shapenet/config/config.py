@@ -51,6 +51,7 @@ def get_shapenet_cfg():
     # Whether to use single view voxel prediction
     # without probabilistic merging
     cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW = False
+    cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT = True
 
     # ------------------------------------------------------------------------ #
     # Mesh Head
