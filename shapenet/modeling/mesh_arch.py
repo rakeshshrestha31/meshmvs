@@ -887,6 +887,92 @@ class VoxMeshDepthHead(VoxDepthHead):
             "view_weights": view_weights
         }
 
+@MESH_ARCH_REGISTRY.register()
+class SphereMeshDepthHead(VoxMeshDepthHead):
+    def __init__(self, cfg):
+        nn.Module.__init__(self)
+        self.ico_sphere_level   = cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL
+        self.contrastive_depth_type = cfg.MODEL.CONTRASTIVE_DEPTH_TYPE
+        self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
+
+        self.mvsnet = MVSNet(cfg.MODEL.MVSNET) if not cfg.MODEL.USE_GT_DEPTH \
+                        else None
+        if cfg.MODEL.RGB_FEATURES_INPUT:
+            self.rgb_cnn, rgb_feat_dims \
+                    = build_backbone(cfg.MODEL.BACKBONE)
+        else:
+            self.rgb_cnn, rgb_feat_dims = None, [0]
+
+        # there is no real (pre-)voxel stage since initial mesh is a sphere
+        # this is just for compatibility with VoxMeshDepthHead (also used for contrastive depth type None)
+        self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+            = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+        post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
+        # depth renderer
+        self.depth_renderer = DepthRenderer(cfg)
+
+        # multi-view feature fusion
+        prefusion_feat_dims = sum(rgb_feat_dims) \
+                            + sum(post_voxel_depth_feat_dims)
+        postfusion_feat_dims = self.init_feature_fusion(
+            cfg, prefusion_feat_dims
+        )
+
+        # mesh head
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
+        self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
+
+        self.register_buffer("K", get_blender_intrinsic_matrix())
+
+        print({
+            "rgb_feat_dims": rgb_feat_dims,
+            "post_voxel_depth_feat_dims": post_voxel_depth_feat_dims,
+            "prefusion_feat_dims": prefusion_feat_dims,
+            "postfusion_feat_dims": postfusion_feat_dims,
+            "Using GT depth input": cfg.MODEL.USE_GT_DEPTH,
+        })
+
+    def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
+        """
+        Args:
+        - imgs: tensor of shape (B, V, 3, H, W)
+        - intrinsics: tensor of shape (B, V, 4, 4)
+        - extrinsics: tensor of shape (B, V, 4, 4)
+        """
+        batch_size = imgs.shape[0]
+        num_views = imgs.shape[1]
+        device = imgs.device
+
+        img_feats = self.extract_rgb_features(imgs)
+        depth_feats, depths, masked_depths = self.extract_depth_features(
+            imgs, masks, extrinsics, **kwargs
+        )
+        rgbd_feats = self.merge_rgbd_features(img_feats, depth_feats)
+
+        rel_extrinsics, P \
+            = self.process_extrinsics(extrinsics, batch_size, device)
+        feats_extractor = self.get_features_extractor(
+            img_feats, depth_feats, rgbd_feats, masked_depths, rel_extrinsics
+        )
+
+        init_meshes = ico_sphere(self.ico_sphere_level, device).extend(batch_size)
+        refined_meshes, mesh_features, view_weights = self.mesh_head(
+            feats_extractor, init_meshes, P
+        )
+
+        rendered_depths = [i["rendered_depths"] for i in mesh_features]
+        # add rendered depth of the final mesh
+        rendered_depths.append(self.depth_renderer(
+            refined_meshes[-1].verts_padded(),
+            refined_meshes[-1].faces_padded(),
+            rel_extrinsics, self.mvsnet_image_size
+        ))
+
+        return {
+            "voxel_scores":None, "meshes_pred": refined_meshes,
+            "pred_depths": depths, "rendered_depths": rendered_depths,
+            "view_weights": view_weights
+        }
 
 @MESH_ARCH_REGISTRY.register()
 class SphereInitHead(nn.Module):

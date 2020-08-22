@@ -68,10 +68,10 @@ def evaluate_test(model, data_loader, vis_preds=False):
         with inference_context(model):
             model_kwargs = {}
             module = model.module if hasattr(model, "module") else model
-            if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+            if isinstance(module, VoxMeshMultiViewHead):
                 model_kwargs["intrinsics"] = batch["intrinsics"]
                 model_kwargs["extrinsics"] = batch["extrinsics"]
-            if type(module) == VoxMeshDepthHead:
+            if isinstance(module, VoxMeshDepthHead):
                 model_kwargs["masks"] = batch["masks"]
 
             model_outputs = model(batch["imgs"], **model_kwargs)
@@ -148,10 +148,10 @@ def evaluate_test_p2m(model, data_loader):
         with inference_context(model):
             model_kwargs = {}
             module = model.module if hasattr(model, "module") else model
-            if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+            if isinstance(module, VoxMeshMultiViewHead):
                 model_kwargs["intrinsics"] = batch["intrinsics"]
                 model_kwargs["extrinsics"] = batch["extrinsics"]
-            if type(module) == VoxMeshDepthHead:
+            if isinstance(module, VoxMeshDepthHead):
                 model_kwargs["masks"] = batch["masks"]
 
             model_outputs = model(batch["imgs"], **model_kwargs)
@@ -206,10 +206,10 @@ def evaluate_split(
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
-        if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+        if isinstance(module, VoxMeshMultiViewHead):
             model_kwargs["intrinsics"] = batch["intrinsics"]
             model_kwargs["extrinsics"] = batch["extrinsics"]
-        if type(module) == VoxMeshDepthHead:
+        if isinstance(module, VoxMeshDepthHead):
             model_kwargs["masks"] = batch["masks"]
             if module.mvsnet is None:
                 model_kwargs["depths"] = batch["depths"]
@@ -291,11 +291,10 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
-        if type(module) in \
-                [VoxMeshMultiViewHead, VoxMeshDepthHead, VoxDepthHead]:
+        if isinstance(module, VoxMeshMultiViewHead):
             model_kwargs["intrinsics"] = batch["intrinsics"]
             model_kwargs["extrinsics"] = batch["extrinsics"]
-        if type(module) in [VoxMeshDepthHead, VoxDepthHead]:
+        if isinstance(module, VoxDepthHead):
             model_kwargs["masks"] = batch["masks"]
             if module.mvsnet is None:
                 model_kwargs["depths"] = batch["depths"]

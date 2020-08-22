@@ -144,12 +144,13 @@ class MeshLoss(nn.Module):
             voxels_gt = torch.cat((voxels_gt[:, 0:1], voxels_gt), dim=1)
             voxel_scores = [merged_voxel_scores, *voxel_scores]
 
-        for voxel_idx, voxel_score in enumerate(voxel_scores):
-            voxel_loss = F.binary_cross_entropy_with_logits(
-                voxel_score, voxels_gt[:, voxel_idx]
-            )
-            losses["voxel"] = losses["voxel"] + voxel_loss
-            losses["voxel_%d" % voxel_idx] = voxel_loss
-        # take average to be invariant to number of views
-        losses["voxel"] = losses["voxel"] / len(voxel_scores)
+        if voxel_scores is not None:
+            for voxel_idx, voxel_score in enumerate(voxel_scores):
+                voxel_loss = F.binary_cross_entropy_with_logits(
+                    voxel_score, voxels_gt[:, voxel_idx]
+                )
+                losses["voxel"] = losses["voxel"] + voxel_loss
+                losses["voxel_%d" % voxel_idx] = voxel_loss
+            # take average to be invariant to number of views
+            losses["voxel"] = losses["voxel"] / len(voxel_scores)
         return losses

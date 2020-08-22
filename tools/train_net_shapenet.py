@@ -235,10 +235,10 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 model_kwargs["voxel_only"] = True
 
             module = model.module if hasattr(model, "module") else model
-            if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+            if isinstance(module, VoxMeshMultiViewHead):
                 model_kwargs["intrinsics"] = batch["intrinsics"]
                 model_kwargs["extrinsics"] = batch["extrinsics"]
-            if type(module) == VoxMeshDepthHead:
+            if isinstance(module, VoxMeshDepthHead):
                 model_kwargs["masks"] = batch["masks"]
                 if module.mvsnet is None:
                     model_kwargs["depths"] = batch["depths"]
@@ -465,10 +465,10 @@ def save_predictions(model, loader, output_dir):
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
-        if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+        if isinstance(module, VoxMeshMultiViewHead):
             model_kwargs["intrinsics"] = batch["intrinsics"]
             model_kwargs["extrinsics"] = batch["extrinsics"]
-        if type(module) == VoxMeshDepthHead:
+        if isinstance(module, VoxMeshDepthHead):
             model_kwargs["masks"] = batch["masks"]
             if module.mvsnet is None:
                 model_kwargs["depths"] = batch["depths"]
