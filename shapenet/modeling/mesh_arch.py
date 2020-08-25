@@ -982,7 +982,7 @@ class SphereMeshDepthHead(VoxMeshDepthHead):
 
         init_meshes = ico_sphere(self.ico_sphere_level, device).extend(batch_size)
         refined_meshes, mesh_features, view_weights = self.mesh_head(
-            feats_extractor, init_meshes, P
+            feats_extractor, init_meshes, P, subdivide=True
         )
 
         rendered_depths = [i["rendered_depths"] for i in mesh_features]
