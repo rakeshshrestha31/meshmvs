@@ -240,7 +240,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 model_kwargs["extrinsics"] = batch["extrinsics"]
             if isinstance(module, VoxMeshDepthHead):
                 model_kwargs["masks"] = batch["masks"]
-                if module.mvsnet is None:
+                if cfg.MODEL.USE_GT_DEPTH:
                     model_kwargs["depths"] = batch["depths"]
 
             with Timer("Forward"):
@@ -287,11 +287,15 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     pred_depths = model_outputs["pred_depths"]
                     masks = batch["masks"]
                     all_ones_masks = torch.ones_like(masks)
-                    resized_masks = F.interpolate(
-                        masks.view(-1, 1, *(masks.shape[2:])),
-                        pred_depths.shape[-2:], mode="nearest"
-                    ).view(*(masks.shape[:2]), *(pred_depths.shape[-2:]))
-                    masked_depths = pred_depths * resized_masks
+                    if pred_depths is not None:
+                        resized_masks = F.interpolate(
+                            masks.view(-1, 1, *(masks.shape[2:])),
+                            pred_depths.shape[-2:], mode="nearest"
+                        ).view(*(masks.shape[:2]), *(pred_depths.shape[-2:]))
+                        masked_depths = pred_depths * resized_masks
+                    else:
+                        masked_depths = None
+
                     for depth_idx, rendered_depth in \
                             enumerate(model_outputs["rendered_depths"]):
                         rendered_depth_loss = adaptive_berhu_loss(

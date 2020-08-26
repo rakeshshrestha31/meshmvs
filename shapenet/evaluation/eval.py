@@ -211,7 +211,7 @@ def evaluate_split(
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if isinstance(module, VoxMeshDepthHead):
             model_kwargs["masks"] = batch["masks"]
-            if module.mvsnet is None:
+            if module.cfg.MODEL.USE_GT_DEPTH:
                 model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
         meshes_pred = model_outputs["meshes_pred"]
@@ -296,7 +296,7 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if isinstance(module, VoxDepthHead):
             model_kwargs["masks"] = batch["masks"]
-            if module.mvsnet is None:
+            if module.cfg.MODEL.USE_GT_DEPTH:
                 model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
         voxel_scores = model_outputs["voxel_scores"]

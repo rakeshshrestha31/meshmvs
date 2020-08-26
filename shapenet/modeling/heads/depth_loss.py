@@ -19,6 +19,11 @@ def adaptive_berhu_loss(depth_gt, depth_est, mask, threshold=0.2):
     Args:
     - depth_gt, depth_est, mask: tensor of shape (B, V, H, W)
     """
+    if depth_est is None:
+        return torch.tensor(0.0).type(depth_gt.dtype).to(depth_gt.device)
+    if depth_gt is None:
+        return torch.tensor(0.0).type(depth_est.dtype).to(depth_est.device)
+
     depth_gt = interpolate_multi_view_tensor(depth_gt, depth_est.shape[-2:])
     mask = interpolate_multi_view_tensor(mask, depth_est.shape[-2:])
 

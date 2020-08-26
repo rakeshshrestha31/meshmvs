@@ -329,7 +329,8 @@ class VoxDepthHead(VoxMeshMultiViewHead):
     def init_mvsnet(self, cfg):
         self.mvsnet_image_size = torch.tensor(cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE)
         if (cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT \
-                or cfg.MODEL.MESH_HEAD.DEPTH_FEATURES_INPUT) \
+                or cfg.MODEL.MESH_HEAD.DEPTH_FEATURES_INPUT \
+                or cfg.MODEL.MVSNET.RENDERED_DEPTH_WEIGHT) \
                 and not cfg.MODEL.USE_GT_DEPTH:
             self.mvsnet = MVSNet(cfg.MODEL.MVSNET)
         else:
@@ -393,7 +394,7 @@ class VoxDepthHead(VoxMeshMultiViewHead):
                 mvsnet_output = {"depths": gt_depth}
             else:
                 # print("both gt depth and mvsnet unavailable")
-                return None
+                return None, None
         else:
             mvsnet_output = self.mvsnet(imgs, extrinsics)
 
@@ -527,7 +528,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         self.contrastive_depth_type = cfg.MODEL.CONTRASTIVE_DEPTH_TYPE
         if cfg.MODEL.MESH_HEAD.RGB_FEATURES_INPUT:
             self.post_voxel_rgb_cnn, post_voxel_rgb_feat_dims \
-                    = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
+                    = build_backbone(cfg.MODEL.MESH_HEAD.RGB_BACKBONE)
         else:
             self.post_voxel_rgb_cnn = None
             post_voxel_rgb_feat_dims = [0]
@@ -849,7 +850,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         return rgbd_feature_extractor
 
     def forward_mesh_head(
-            self, imgs, depths, intrinsics, extrinsics,
+            self, imgs, pred_depths, intrinsics, extrinsics,
             masks, initial_meshes, **kwargs
     ):
         batch_size = imgs.shape[0]
@@ -859,7 +860,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         rel_extrinsics, P \
             = self.process_extrinsics(extrinsics, batch_size, device)
         feats_extractor = self.get_mesh_head_features_extractor(
-            imgs, depths, rel_extrinsics
+            imgs, pred_depths, rel_extrinsics
         )
 
         refined_meshes, mesh_features, view_weights = self.mesh_head(
