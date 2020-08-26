@@ -11,8 +11,6 @@ def get_shapenet_cfg():
 
     cfg = CN()
     cfg.MODEL = CN()
-    cfg.MODEL.BACKBONE = "resnet50"
-    cfg.MODEL.DEPTH_BACKBONE = "resnet50"
     cfg.MODEL.VOXEL_ON = False
     cfg.MODEL.MESH_ON = False
     # options: none | input_concat | input_diff | feature_concat | feature_diff
@@ -52,6 +50,8 @@ def get_shapenet_cfg():
     cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW = False
     cfg.MODEL.VOXEL_HEAD.RGB_FEATURES_INPUT = True
     cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT = True
+    cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE = "resnet50"
+    cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE = "vgg"
 
     # ------------------------------------------------------------------------ #
     # Mesh Head
@@ -77,6 +77,8 @@ def get_shapenet_cfg():
 
     cfg.MODEL.MESH_HEAD.RGB_FEATURES_INPUT = True
     cfg.MODEL.MESH_HEAD.DEPTH_FEATURES_INPUT = True
+    cfg.MODEL.MESH_HEAD.RGB_BACKBONE = "resnet50"
+    cfg.MODEL.MESH_HEAD.DEPTH_BACKBONE = "vgg"
 
     cfg.MODEL.MVSNET = CN()
     cfg.MODEL.MVSNET.FEATURES_LIST = [32, 64, 128, 256]

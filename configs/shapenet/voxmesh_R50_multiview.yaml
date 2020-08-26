@@ -1,5 +1,4 @@
 MODEL:
-  BACKBONE: "resnet50"
   VOXEL_ON: True
   MESH_ON: True
   CHECKPOINT: ""
@@ -21,6 +20,7 @@ MODEL:
     CHAMFER_LOSS_WEIGHT: 1.0
     NORMALS_LOSS_WEIGHT: 0.0
     EDGE_LOSS_WEIGHT: 0.0
+    RGB_BACKBONE: "resnet50"
 DATASETS:
   NAME: "shapenet"
   TYPE: "multi_view"

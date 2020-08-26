@@ -30,7 +30,7 @@ class VoxMeshHead(nn.Module):
 
         self.setup(cfg)
         # backbone
-        self.backbone, feat_dims = build_backbone(cfg.MODEL.BACKBONE)
+        self.backbone, feat_dims = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
@@ -97,7 +97,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
 
         # backbone
-        self.backbone, feat_dims = build_backbone(cfg.MODEL.BACKBONE)
+        self.backbone, feat_dims = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
@@ -340,13 +340,13 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
         if cfg.MODEL.VOXEL_HEAD.RGB_FEATURES_INPUT:
             self.pre_voxel_rgb_cnn, pre_voxel_rgb_feat_dims \
-                    = build_backbone(cfg.MODEL.BACKBONE)
+                    = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
         else:
             self.pre_voxel_rgb_cnn, pre_voxel_rgb_feat_dims = None, [0]
 
         if cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT:
             self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
-                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+                = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
         else:
             self.pre_voxel_depth_cnn = None
             pre_voxel_depth_feat_dims = [0]
@@ -527,7 +527,7 @@ class VoxMeshDepthHead(VoxDepthHead):
         self.contrastive_depth_type = cfg.MODEL.CONTRASTIVE_DEPTH_TYPE
         if cfg.MODEL.MESH_HEAD.RGB_FEATURES_INPUT:
             self.post_voxel_rgb_cnn, post_voxel_rgb_feat_dims \
-                    = build_backbone(cfg.MODEL.BACKBONE)
+                    = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
         else:
             self.post_voxel_rgb_cnn = None
             post_voxel_rgb_feat_dims = [0]
@@ -566,24 +566,24 @@ class VoxMeshDepthHead(VoxDepthHead):
         """
         if self.contrastive_depth_type == 'input_concat':
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
-                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 2)
+                = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 2)
         elif self.contrastive_depth_type == 'input_diff':
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
-                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+                = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
         elif self.contrastive_depth_type == 'feature_concat':
             # don't reuse same features used for voxel prediction
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
-                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+                = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
             # Twice the features from predicted and rendered depths
             post_voxel_depth_feat_dims = [i * 2 for i in post_voxel_depth_feat_dims]
         elif self.contrastive_depth_type == 'feature_diff':
             # don't reuse same features used for voxel prediction
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
-                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+                = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
         elif self.contrastive_depth_type == 'none':
             # don't reuse same features used for voxel prediction
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
-                = build_custom_backbone(cfg.MODEL.DEPTH_BACKBONE, 1)
+                = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
         else:
             print(
                 'Unrecognized contrastive depth type:', self.contrastive_depth_type
@@ -971,7 +971,7 @@ class SphereInitHead(nn.Module):
         super(SphereInitHead, self).__init__()
 
         # fmt: off
-        backbone                = cfg.MODEL.BACKBONE
+        backbone                = cfg.MODEL.MESH_HEAD.RGB_BACKBONE
         self.ico_sphere_level   = cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL
         # fmt: on
 
@@ -1008,7 +1008,7 @@ class Pixel2MeshHead(nn.Module):
         super(Pixel2MeshHead, self).__init__()
 
         # fmt: off
-        backbone                = cfg.MODEL.BACKBONE
+        backbone                = cfg.MODEL.MESH_HEAD.RGB_BACKBONE
         self.ico_sphere_level   = cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL
         # fmt: on
 
