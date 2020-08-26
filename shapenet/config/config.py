@@ -17,7 +17,6 @@ def get_shapenet_cfg():
     cfg.MODEL.MESH_ON = False
     # options: none | input_concat | input_diff | feature_concat | feature_diff
     cfg.MODEL.CONTRASTIVE_DEPTH_TYPE = "none"
-    cfg.MODEL.RGB_FEATURES_INPUT = False
     cfg.MODEL.USE_GT_DEPTH = False
     # options: multihead_attention | simple_attention | stats
     cfg.MODEL.FEATURE_FUSION_METHOD = "multihead_attention"
@@ -51,6 +50,7 @@ def get_shapenet_cfg():
     # Whether to use single view voxel prediction
     # without probabilistic merging
     cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW = False
+    cfg.MODEL.VOXEL_HEAD.RGB_FEATURES_INPUT = True
     cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT = True
 
     # ------------------------------------------------------------------------ #
@@ -74,6 +74,9 @@ def get_shapenet_cfg():
     cfg.MODEL.MESH_HEAD.EDGE_LOSS_WEIGHT = 1.0
     # Init ico_sphere level (only for when voxel_on is false)
     cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL = -1
+
+    cfg.MODEL.MESH_HEAD.RGB_FEATURES_INPUT = True
+    cfg.MODEL.MESH_HEAD.DEPTH_FEATURES_INPUT = True
 
     cfg.MODEL.MVSNET = CN()
     cfg.MODEL.MVSNET.FEATURES_LIST = [32, 64, 128, 256]
