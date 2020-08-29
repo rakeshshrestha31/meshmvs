@@ -315,6 +315,7 @@ class VoxDepthHead(VoxMeshMultiViewHead):
 
         self.init_mvsnet(cfg)
         self.init_voxel_head(cfg)
+        self.cfg = cfg
 
     def freeze_voxel_head(self):
         modules_to_freeze = [

@@ -332,6 +332,7 @@ def eval_and_save(
         logger.info("Evaluating on training set:")
         train_metrics = evaluate_vox(
             model, loaders["train_eval"],
+            max_predictions=1000
         )
         train_metrics = {
             "train_%s" % key: val
@@ -397,10 +398,10 @@ def save_predictions(model, loader, output_dir):
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
-        if type(module) in [VoxMeshMultiViewHead, VoxMeshDepthHead]:
+        if isinstance(module, VoxMeshMultiViewHead):
             model_kwargs["intrinsics"] = batch["intrinsics"]
             model_kwargs["extrinsics"] = batch["extrinsics"]
-        if type(module) == VoxMeshDepthHead:
+        if isinstance(module, VoxDepthHead):
             model_kwargs["masks"] = batch["masks"]
             if module.mvsnet is None:
                 model_kwargs["depths"] = batch["depths"]
