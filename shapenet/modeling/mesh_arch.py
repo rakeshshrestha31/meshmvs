@@ -17,7 +17,7 @@ from shapenet.modeling.heads import \
 from shapenet.modeling.voxel_ops import \
         dummy_mesh, add_dummy_meshes, cubify, merge_multi_view_voxels, logit
 from shapenet.utils.coords import \
-        get_blender_intrinsic_matrix, relative_extrinsics
+        get_blender_intrinsic_matrix, relative_extrinsics, get_initial_sphere_meshes
 from shapenet.data.utils import imagenet_deprocess
 
 MESH_ARCH_REGISTRY = Registry("MESH_ARCH")
@@ -952,7 +952,7 @@ class SphereMeshDepthHead(VoxMeshDepthHead):
             imgs, masks, extrinsics, **kwargs
         )
 
-        init_meshes = ico_sphere(self.ico_sphere_level, device).extend(batch_size)
+        init_meshes = get_initial_sphere_meshes(self.ico_sphere_level, device).extend(batch_size)
         mesh_head_output = self.forward_mesh_head(
             imgs, masked_depths,
             intrinsics, extrinsics,
@@ -961,6 +961,7 @@ class SphereMeshDepthHead(VoxMeshDepthHead):
 
         return {
             **mesh_head_output,
+            "init_meshes": init_meshes,
             "voxel_scores": None,
             "pred_depths": depths,
             "masked_pred_depths": masked_depths

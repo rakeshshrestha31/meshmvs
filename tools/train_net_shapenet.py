@@ -537,27 +537,39 @@ def save_debug_predictions(batch, model_outputs):
     from shapenet.modeling.mesh_arch import save_depths
 
     batch_size = len(batch["id_strs"])
-    for view_idx, voxels in enumerate(model_outputs["voxel_scores"]):
-        cubified = cubify(voxels, 48, 0.2)
+    if model_outputs.get("voxel_scores", None) is not None:
+        for view_idx, voxels in enumerate(model_outputs["voxel_scores"]):
+            cubified = cubify(voxels, 48, 0.2)
+            for batch_idx in range(batch_size):
+                label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+                save_obj(
+                    "/tmp/{}_{}_{}_multiview_vox.obj".format(
+                        label, label_appendix, view_idx
+                    ),
+                    cubified[batch_idx].verts_packed(),
+                    cubified[batch_idx].faces_packed()
+                )
+        merged_voxels = cubify(model_outputs["merged_voxel_scores"], 48, 0.2)
         for batch_idx in range(batch_size):
             label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
             save_obj(
-                "/tmp/{}_{}_{}_multiview_vox.obj".format(
-                    label, label_appendix, view_idx
+                "/tmp/{}_{}_merged_vox.obj".format(
+                    label, label_appendix
                 ),
-                cubified[batch_idx].verts_packed(),
-                cubified[batch_idx].faces_packed()
+                merged_voxels[batch_idx].verts_packed(),
+                merged_voxels[batch_idx].faces_packed()
             )
-    merged_voxels = cubify(model_outputs["merged_voxel_scores"], 48, 0.2)
-    for batch_idx in range(batch_size):
-        label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
-        save_obj(
-            "/tmp/{}_{}_merged_vox.obj".format(
-                label, label_appendix
-            ),
-            merged_voxels[batch_idx].verts_packed(),
-            merged_voxels[batch_idx].faces_packed()
-        )
+
+    if model_outputs.get("init_meshes", None) is not None:
+        for batch_idx in range(batch_size):
+            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            save_obj(
+                "/tmp/{}_{}_init_mesh.obj".format(
+                    label, label_appendix
+                ),
+                model_outputs["init_meshes"][0].verts_packed(),
+                model_outputs["init_meshes"][0].faces_packed()
+            )
 
     for stage_idx, pred_mesh in enumerate(model_outputs["meshes_pred"]):
         for batch_idx in range(batch_size):

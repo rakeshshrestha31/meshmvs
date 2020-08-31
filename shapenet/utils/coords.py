@@ -6,6 +6,7 @@ import math
 import torch
 import torch.nn.functional as F
 from pytorch3d.structures import Meshes
+from pytorch3d.utils import ico_sphere
 
 SHAPENET_MIN_ZMIN = 0.67
 SHAPENET_MAX_ZMAX = 0.92
@@ -374,3 +375,21 @@ def custom_padded_grid_sample(input, grid, pad_value=0.0, **kwargs):
     input = input - pad_value
     return F.grid_sample(input, grid, padding_mode="zeros", **kwargs) \
                 + pad_value
+
+
+def get_initial_sphere_meshes(level, device):
+    """
+    wrapper around pytorch3d.utils.ico_sphere
+    returns mesh at proper position/scale
+    """
+    init_meshes = ico_sphere(level, device)
+    # TODO: Don't use these magic numbers
+    init_meshes.scale_verts_(0.25)
+    offset = init_meshes.verts_packed().clone()
+    offset[:, :] = 0
+    # average depth of objects is 1.4m
+    # z is negative because of coordinate from convention
+    offset[:, 2] = -1.4
+    init_meshes.offset_verts_(offset)
+    return init_meshes
+
