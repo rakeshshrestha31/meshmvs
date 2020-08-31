@@ -316,13 +316,6 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             cfg.SOLVER.EARLY_STOP_METRIC
         )
 
-    if comm.is_main_process():
-        logger.info("Evaluating on test set:")
-        test_loader = build_data_loader(
-            cfg, get_dataset_name(cfg), "test", multigpu=False
-        )
-        evaluate_test(model, test_loader)
-
 
 def eval_and_save(
     model, loaders, optimizer, scheduler, cp, early_stop_metric
