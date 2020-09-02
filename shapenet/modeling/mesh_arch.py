@@ -341,27 +341,27 @@ class VoxDepthHead(VoxMeshMultiViewHead):
     def init_voxel_head(self, cfg):
         self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
         if cfg.MODEL.VOXEL_HEAD.RGB_FEATURES_INPUT:
-            self.pre_voxel_rgb_cnn, pre_voxel_rgb_feat_dims \
+            self.pre_voxel_rgb_cnn, self.pre_voxel_rgb_feat_dims \
                     = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
         else:
-            self.pre_voxel_rgb_cnn, pre_voxel_rgb_feat_dims = None, [0]
+            self.pre_voxel_rgb_cnn, self.pre_voxel_rgb_feat_dims = None, [0]
 
         if cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT:
-            self.pre_voxel_depth_cnn, pre_voxel_depth_feat_dims \
+            self.pre_voxel_depth_cnn, self.pre_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
         else:
             self.pre_voxel_depth_cnn = None
-            pre_voxel_depth_feat_dims = [0]
+            self.pre_voxel_depth_feat_dims = [0]
 
         # voxel head
         cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS = \
-                pre_voxel_rgb_feat_dims[-1] + pre_voxel_depth_feat_dims[-1]
+                self.pre_voxel_rgb_feat_dims[-1] + self.pre_voxel_depth_feat_dims[-1]
         self.voxel_head = VoxelHead(cfg)
         if cfg.MODEL.VOXEL_HEAD.FREEZE:
             self.freeze_voxel_head()
         print({
-            "pre_voxel_rgb_feat_dims": pre_voxel_rgb_feat_dims,
-            "pre_voxel_depth_feat_dims": pre_voxel_depth_feat_dims,
+            "pre_voxel_rgb_feat_dims": self.pre_voxel_rgb_feat_dims,
+            "pre_voxel_depth_feat_dims": self.pre_voxel_depth_feat_dims,
             "vox_head_input": cfg.MODEL.VOXEL_HEAD.COMPUTED_INPUT_CHANNELS,
         })
 
@@ -528,38 +528,43 @@ class VoxMeshDepthHead(VoxDepthHead):
     def init_mesh_head(self, cfg):
         self.contrastive_depth_type = cfg.MODEL.CONTRASTIVE_DEPTH_TYPE
         if cfg.MODEL.MESH_HEAD.RGB_FEATURES_INPUT:
-            self.post_voxel_rgb_cnn, post_voxel_rgb_feat_dims \
-                    = build_backbone(cfg.MODEL.MESH_HEAD.RGB_BACKBONE)
+            if self.pre_voxel_rgb_cnn is not None:
+                # reuse RGB CNN is already exists
+                self.post_voxel_rgb_cnn = self.pre_voxel_rgb_cnn
+                self.post_voxel_rgb_feat_dims = self.pre_voxel_rgb_feat_dims
+            else:
+                self.post_voxel_rgb_cnn, self.post_voxel_rgb_feat_dims \
+                        = build_backbone(cfg.MODEL.MESH_HEAD.RGB_BACKBONE)
         else:
             self.post_voxel_rgb_cnn = None
-            post_voxel_rgb_feat_dims = [0]
+            self.post_voxel_rgb_feat_dims = [0]
 
         if cfg.MODEL.MESH_HEAD.DEPTH_FEATURES_INPUT:
-            post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
+            self.post_voxel_depth_feat_dims = self.init_post_voxel_depth_cnn(cfg)
         else:
             self.post_voxel_depth_cnn = None
-            post_voxel_depth_feat_dims = [0]
+            self.post_voxel_depth_feat_dims = [0]
 
 
         # multi-view feature fusion
-        prefusion_feat_dims = sum(post_voxel_rgb_feat_dims) \
-                            + sum(post_voxel_depth_feat_dims)
-        postfusion_feat_dims = self.init_feature_fusion(
-            cfg, prefusion_feat_dims
+        self.prefusion_feat_dims = sum(self.post_voxel_rgb_feat_dims) \
+                            + sum(self.post_voxel_depth_feat_dims)
+        self.postfusion_feat_dims = self.init_feature_fusion(
+            cfg, self.prefusion_feat_dims
         )
 
         # mesh head
-        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = postfusion_feat_dims
+        cfg.MODEL.MESH_HEAD.COMPUTED_INPUT_CHANNELS = self.postfusion_feat_dims
         self.mesh_head = MeshRefinementHead(cfg, self.fuse_multiview_features)
         # depth renderer
         self.depth_renderer = DepthRenderer(cfg)
 
 
         print({
-            "post_voxel_rgb_feat_dims": post_voxel_rgb_feat_dims,
-            "post_voxel_depth_feat_dims": post_voxel_depth_feat_dims,
-            "prefusion_feat_dims": prefusion_feat_dims,
-            "postfusion_feat_dims": postfusion_feat_dims
+            "post_voxel_rgb_feat_dims": self.post_voxel_rgb_feat_dims,
+            "post_voxel_depth_feat_dims": self.post_voxel_depth_feat_dims,
+            "prefusion_feat_dims": self.prefusion_feat_dims,
+            "postfusion_feat_dims": self.postfusion_feat_dims
         })
 
     def init_post_voxel_depth_cnn(self, cfg):
