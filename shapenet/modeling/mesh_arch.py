@@ -528,7 +528,7 @@ class VoxMeshDepthHead(VoxDepthHead):
     def init_mesh_head(self, cfg):
         self.contrastive_depth_type = cfg.MODEL.CONTRASTIVE_DEPTH_TYPE
         if cfg.MODEL.MESH_HEAD.RGB_FEATURES_INPUT:
-            if self.pre_voxel_rgb_cnn is not None:
+            if getattr(self, "pre_voxel_rgb_cnn", None) is not None:
                 # reuse RGB CNN is already exists
                 self.post_voxel_rgb_cnn = self.pre_voxel_rgb_cnn
                 self.post_voxel_rgb_feat_dims = self.pre_voxel_rgb_feat_dims
