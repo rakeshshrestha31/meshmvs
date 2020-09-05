@@ -739,6 +739,59 @@ class VoxMeshDepthHead(VoxDepthHead):
             "rendered_depths": rendered_depths
         }
 
+    def extract_contrastive_feature_diff_features(
+        self, meshes, pred_depths, extrinsics
+    ):
+        """
+        contrastive depth feature extractor using feature_diff
+
+            Args:
+            - meshes (Meshes)
+            - pred_depths (tensor): shape (B, V, H, W)
+            - extrinsics (list of tensors): list of (B, 4, 4) transformations
+            Returns:
+            - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                                  or a list of such tensors.
+            - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        # (B, V, H, W)
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+
+        if self.post_voxel_depth_cnn is not None:
+            batch_size, num_views = rendered_depths.shape[:2]
+
+            pred_depths = F.interpolate(
+                pred_depths, rendered_depths.shape[-2:], mode="nearest"
+            )
+            # (B, V, 2, H, W)
+            contrastive_input = torch.stack((pred_depths, rendered_depths), axis=2)
+            # not really contrastive input, just for batch processing
+            # (B*V*2, H, W)
+            contrastive_input = contrastive_input.view(-1, 1, *rendered_depths.shape[2:])
+
+            # list of (B*V*2, C, H, W)
+            contrastive_feats = self.post_voxel_depth_cnn(contrastive_input)
+            # list of (B, V, 2, C, H, W)
+            contrastive_feats = [
+                i.view(batch_size, num_views, 2, -1, *(i.shape[2:]))
+                for i in contrastive_feats
+            ]
+            # list of (B, V, C, H, W)
+            contrastive_feats = [
+                i[:, :, 0, :, :, :] - i[:, :, 1, :, :, :]
+                for i in contrastive_feats
+            ]
+        else:
+            contrastive_feats = []
+
+        return {
+            "contrastive_feats": contrastive_feats,
+            "rendered_depths": rendered_depths
+        }
+
     def extract_contrastive_none_features(
         self, meshes, pred_depths, extrinsics
     ):
