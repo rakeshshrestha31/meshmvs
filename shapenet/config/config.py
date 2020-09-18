@@ -127,6 +127,7 @@ def get_shapenet_cfg():
     cfg.DATASETS.NAME = "shapenet"
     # ['depth', 'multi_view', 'single_view']
     cfg.DATASETS.TYPE = "single_view"
+    cfg.DATASETS.SPLITS_FILE = "./datasets/shapenet/pix2mesh_splits_val05.json"
 
     cfg.DATASETS.INPUT_VIEWS = [0, 6, 7]
 

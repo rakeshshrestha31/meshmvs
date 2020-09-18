@@ -664,9 +664,8 @@ def setup(args):
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     # register dataset
-    data_dir, splits_file = register_shapenet(cfg.DATASETS.NAME)
+    data_dir = register_shapenet(cfg.DATASETS.NAME)
     cfg.DATASETS.DATA_DIR = data_dir
-    cfg.DATASETS.SPLITS_FILE = splits_file
     # if data was copied the data dir has changed
     if args.copy_data:
         cfg.DATASETS.DATA_DIR = args.data_dir
