@@ -465,10 +465,12 @@ def save_predictions(model, loader, output_dir):
         model = model.module
 
     device = torch.device("cuda:0")
-    os.makedirs(output_dir, exist_ok=True)
+    for i in range(3):
+        os.makedirs(os.path.join(output_dir, str(i)), exist_ok=True)
 
     for batch in tqdm.tqdm(loader):
         batch = loader.postprocess(batch, device)
+
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
         if isinstance(module, VoxMeshMultiViewHead):
@@ -484,50 +486,60 @@ def save_predictions(model, loader, output_dir):
         # save_debug_predictions(batch, model_outputs)
         # continue
 
-        pred_mesh = model_outputs["meshes_pred"][-1]
         gt_mesh = batch["meshes"]
-        pred_mesh = pred_mesh.scale_verts(P2M_SCALE)
         gt_mesh = gt_mesh.scale_verts(P2M_SCALE)
-
-        pred_points = sample_points_from_meshes(
-            pred_mesh, NUM_PRED_SURFACE_SAMPLES, return_normals=False
-        )
         gt_points = sample_points_from_meshes(
             gt_mesh, NUM_GT_SURFACE_SAMPLES, return_normals=False
         )
-
-        pred_points = pred_points.cpu().detach().numpy()
         gt_points = gt_points.cpu().detach().numpy()
 
-        batch_size = pred_points.shape[0]
-        for batch_idx in range(batch_size):
-            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
-            pred_filename = os.path.join(
-                output_dir, "{}_{}_predict.xyz".format(label, label_appendix)
+        # only the last stage
+        gcn_stages = [len(model_outputs["meshes_pred"])-1]
+        # all stages
+        # gcn_stages = range(len(model_outputs["meshes_pred"]))
+        for gcn_stage in gcn_stages:
+            pred_mesh = model_outputs["meshes_pred"][gcn_stage]
+            pred_mesh = pred_mesh.scale_verts(P2M_SCALE)
+
+            pred_points = sample_points_from_meshes(
+                pred_mesh, NUM_PRED_SURFACE_SAMPLES, return_normals=False
             )
-            gt_filename = os.path.join(
-                output_dir, "{}_{}_ground.xyz".format(label, label_appendix)
-            )
+            pred_points = pred_points.cpu().detach().numpy()
 
-            np.savetxt(pred_filename, pred_points[batch_idx])
-            np.savetxt(gt_filename, gt_points[batch_idx])
+            batch_size = pred_points.shape[0]
+            for batch_idx in range(batch_size):
+                label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+                file_prefix = str(gcn_stage)
+                os.makedirs(os.path.join(output_dir, file_prefix), exist_ok=True)
 
-            # pred_filename = pred_filename.replace(".xyz", ".obj")
-            # gt_filename = gt_filename.replace(".xyz", ".obj")
+                pred_filename = os.path.join(
+                    os.path.join(output_dir, file_prefix),
+                    "{}_{}_predict.xyz".format(label, label_appendix)
+                )
+                np.savetxt(pred_filename, pred_points[batch_idx])
 
-            # pred_verts, pred_faces = pred_mesh[batch_idx] \
-            #                             .get_mesh_verts_faces(0)
-            # gt_verts, gt_faces = gt_mesh[batch_idx] \
-            #                         .get_mesh_verts_faces(0)
-            # save_obj(pred_filename, pred_verts, pred_faces)
-            # save_obj(gt_filename, gt_verts, gt_faces)
+                gt_filename = os.path.join(
+                    os.path.join(output_dir, file_prefix),
+                    "{}_{}_ground.xyz".format(label, label_appendix)
+                )
+                np.savetxt(gt_filename, gt_points[batch_idx])
 
-            # metrics = compare_meshes(
-            #     pred_mesh[batch_idx], gt_mesh[batch_idx],
-            #     num_samples=NUM_GT_SURFACE_SAMPLES, scale=1.0,
-            #     thresholds=[0.01, 0.014142], reduce=True
-            # )
-            # print("%s_%s: %r" % (label, label_appendix, metrics))
+                pred_filename = pred_filename.replace(".xyz", ".obj")
+                gt_filename = gt_filename.replace(".xyz", ".obj")
+
+                pred_verts, pred_faces = pred_mesh[batch_idx] \
+                                            .get_mesh_verts_faces(0)
+                gt_verts, gt_faces = gt_mesh[batch_idx] \
+                                        .get_mesh_verts_faces(0)
+                save_obj(pred_filename, pred_verts, pred_faces)
+                save_obj(gt_filename, gt_verts, gt_faces)
+
+                # metrics = compare_meshes(
+                #     pred_mesh[batch_idx], gt_mesh[batch_idx],
+                #     num_samples=NUM_GT_SURFACE_SAMPLES, scale=1.0,
+                #     thresholds=[0.01, 0.014142], reduce=True
+                # )
+                # print("%s_%s: %r" % (label, label_appendix, metrics))
 
 
 @torch.no_grad()
