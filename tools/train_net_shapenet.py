@@ -19,11 +19,13 @@ from detectron2.utils.logger import setup_logger
 from fvcore.common.file_io import PathManager
 from pytorch3d.ops import sample_points_from_meshes
 from pytorch3d.io import save_obj
+from pytorch3d.transforms import Transform3d
 
 from shapenet.config import get_shapenet_cfg
 from shapenet.data import build_data_loader, register_shapenet
 from shapenet.evaluation import \
         evaluate_split, evaluate_test, evaluate_test_p2m, evaluate_vox
+from shapenet.utils.coords import relative_extrinsics
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
@@ -574,20 +576,58 @@ def save_debug_predictions(batch, model_outputs):
     for stage_idx, pred_mesh in enumerate(model_outputs["meshes_pred"]):
         for batch_idx in range(batch_size):
             label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            # dim: num_points x 1 x num_views
             view_weights = model_outputs["view_weights"][stage_idx][batch_idx]
+            # dim: num_points x num_views
             view_weights = F.normalize(view_weights, dim=-1).squeeze(1)
+            view_weights = view_weights.detach().cpu().numpy()
+            # show only the view with maximum weight
+            max_indices = np.argmax(view_weights, axis=-1)
+            # one hot encoded indices
+            one_hot = np.eye(view_weights.shape[1])[max_indices]
+            max_view_weights = view_weights * one_hot
+
             save_obj("/tmp/{}_{}_{}_pred_mesh.obj".format(
                 label, label_appendix, stage_idx
             ), pred_mesh[0].verts_packed(), pred_mesh[0].faces_packed())
-            point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
-                pred_mesh[0].verts_packed().cpu().numpy()
-            ))
-            point_cloud.colors = o3d.utility.Vector3dVector(
-                view_weights.detach().cpu().numpy()
-            )
-            o3d.io.write_point_cloud("/tmp/{}_{}_{}_pred_cloud.ply".format(
-                label, label_appendix, stage_idx
-            ), point_cloud)
+
+            num_views = model_outputs["view_weights"][stage_idx].shape[-1]
+            global_pred_points = pred_mesh[0].verts_packed()
+            global_gt_points = batch["points"][0]
+            points_color = o3d.utility.Vector3dVector(max_view_weights)
+            rel_extrinsics  = relative_extrinsics(batch["extrinsics"], batch["extrinsics"][:, 0])
+
+            # visualize weights for each view
+            for view_idx in range(num_views):
+                transform = Transform3d(
+                    matrix=rel_extrinsics[batch_idx, view_idx].transpose(0, 1),
+                    dtype=global_pred_points.dtype, device=global_pred_points.device
+                )
+
+                # pred points
+                local_pred_points = transform.transform_points(global_pred_points)
+                point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                    local_pred_points.cpu().numpy()
+                ))
+                point_cloud.colors = points_color
+                o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}_pred_cloud.ply".format(
+                    label, label_appendix, stage_idx, view_idx
+                ), point_cloud)
+
+                # gt points
+                local_gt_points = transform.transform_points(global_gt_points)
+                point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                    local_gt_points.cpu().numpy()
+                ))
+                # gt weights for ground truth corresponding to view idx
+                gt_view_weights = np.zeros(
+                    (local_gt_points.shape[0], num_views), dtype=np.float64
+                )
+                gt_view_weights[:, view_idx] = 1.0
+                point_cloud.colors = o3d.utility.Vector3dVector(gt_view_weights)
+                o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}_gt_cloud.ply".format(
+                    label, label_appendix, stage_idx, view_idx
+                ), point_cloud)
 
     if "pred_depths" in model_outputs:
         masks = F.interpolate(
