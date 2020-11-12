@@ -587,7 +587,8 @@ class VoxMeshDepthHead(VoxDepthHead):
             # don't reuse same features used for voxel prediction
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
-        elif self.contrastive_depth_type == 'none':
+        elif self.contrastive_depth_type in \
+                ['predicted_depth_only', 'rendered_depth_only']:
             # don't reuse same features used for voxel prediction
             self.post_voxel_depth_cnn, post_voxel_depth_feat_dims \
                 = build_custom_backbone(cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE, 1)
@@ -792,11 +793,11 @@ class VoxMeshDepthHead(VoxDepthHead):
             "rendered_depths": rendered_depths
         }
 
-    def extract_contrastive_none_features(
+    def extract_predicted_depth_only_features(
         self, meshes, pred_depths, extrinsics
     ):
         """
-        contrastive depth feature extractor using "none"
+        depth feature extractor using predicted depth only (no contrastive depth)
 
         Args:
         - meshes (Meshes)
@@ -822,6 +823,52 @@ class VoxMeshDepthHead(VoxDepthHead):
 
             # (B*V, 1, H, W)
             contrastive_input = pred_depths.view(-1, 1, *(pred_depths.shape[2:]))
+            # list of (B*V, C, H, W)
+            contrastive_feats = self.post_voxel_depth_cnn(contrastive_input)
+
+            # list of (B, V, C, H, W)
+            contrastive_feats = [
+                i.view(batch_size, num_views, -1, *(i.shape[2:]))
+                for i in contrastive_feats
+            ]
+        else:
+            contrastive_feats = []
+
+        return {
+            "contrastive_feats": contrastive_feats,
+            "rendered_depths": rendered_depths
+        }
+
+    def extract_rendered_depth_only_features(
+        self, meshes, pred_depths, extrinsics
+    ):
+        """
+        depth feature extractor using rendered depth only (no contrastive depth)
+
+        Args:
+        - meshes (Meshes)
+        - pred_depths (tensor): shape (B, V, H, W)
+        - extrinsics (list of tensors): list of (B, 4, 4) transformations
+        Returns:
+        - feats (tensor): Tensor of shape (B, V, C, H, W) giving image features,
+                              or a list of such tensors.
+        - rendered_depths (tensor): shape (B, V, H, W)
+        """
+        # (B, V, H, W)
+        rendered_depths = self.depth_renderer(
+            meshes.verts_padded(), meshes.faces_padded(),
+            extrinsics, self.mvsnet_image_size
+        )
+
+        if self.post_voxel_depth_cnn is not None:
+            batch_size, num_views = rendered_depths.shape[:2]
+
+            pred_depths = F.interpolate(
+                pred_depths, rendered_depths.shape[-2:], mode="nearest"
+            )
+
+            # (B*V, 1, H, W)
+            contrastive_input = rendered_depths.view(-1, 1, *(rendered_depths.shape[2:]))
             # list of (B*V, C, H, W)
             contrastive_feats = self.post_voxel_depth_cnn(contrastive_input)
 
@@ -864,9 +911,14 @@ class VoxMeshDepthHead(VoxDepthHead):
                 self.extract_contrastive_feature_diff_features,
                 pred_depths=pred_depths, extrinsics=rel_extrinsics
             )
-        elif self.contrastive_depth_type == 'none':
+        elif self.contrastive_depth_type == 'predicted_depth_only':
             return functools.partial(
-                self.extract_contrastive_none_features,
+                self.extract_predicted_depth_only_features,
+                pred_depths=pred_depths, extrinsics=rel_extrinsics
+            )
+        elif self.contrastive_depth_type == 'rendered_depth_only':
+            return functools.partial(
+                self.extract_rendered_depth_only_features,
                 pred_depths=pred_depths, extrinsics=rel_extrinsics
             )
         else:

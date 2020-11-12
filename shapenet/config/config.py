@@ -13,8 +13,8 @@ def get_shapenet_cfg():
     cfg.MODEL = CN()
     cfg.MODEL.VOXEL_ON = False
     cfg.MODEL.MESH_ON = False
-    # options: none | input_concat | input_diff | feature_concat | feature_diff
-    cfg.MODEL.CONTRASTIVE_DEPTH_TYPE = "none"
+    # options: predicted_depth_only | rendered_depth_only | input_concat | input_diff | feature_concat | feature_diff
+    cfg.MODEL.CONTRASTIVE_DEPTH_TYPE = "input_concat"
     cfg.MODEL.USE_GT_DEPTH = False
     # options: multihead_attention | simple_attention | stats
     cfg.MODEL.FEATURE_FUSION_METHOD = "multihead_attention"
