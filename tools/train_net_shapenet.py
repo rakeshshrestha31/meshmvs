@@ -124,7 +124,7 @@ def main_worker_eval(worker_id, args):
         logger.info(str_out)
     else:
         prediction_dir = os.path.join(
-            cfg.OUTPUT_DIR, "predictions", "eval", "predict", "0"
+            cfg.OUTPUT_DIR, "predictions", "eval", "predict"
         )
         save_predictions(model, test_loader, prediction_dir)
     exit(0)
