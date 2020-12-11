@@ -1,8 +1,9 @@
-# MeshMVS
+# MeshMVS: Multi-View Stereo Guided Mesh Reconstruction
+
+Open source code for [paper][paper]
 
 ## Installation Requirements
-- [Detectron2][d2]
-- [PyTorch3D][py3d]
+```pip install -r requirements.txt```
 
 To install
 ```
@@ -67,3 +68,4 @@ python f_score.py --gpu_id 0 --save_path ~/projects/meshrcnn/output/predictions/
 
 ```
 
+[paper]: https://arxiv.org/abs/2010.08682
