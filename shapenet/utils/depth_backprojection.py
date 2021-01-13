@@ -15,15 +15,16 @@ def unflatten_batch_view(tensor, batch_size):
     return tensor.view(batch_size, -1, *tensor.size()[1:])
 
 def get_bearing_vectors(width, height, intrinsics, dtype, device):
-    # form tensor with image (u, v) coordinates
-    u_indices = torch.linspace(0, width - 1, width,
+    # form tensor with normalized image (u, v) coordinates
+    u_indices = torch.linspace(-1, 1, width,
                                dtype=dtype, device=device)
-    v_indices = torch.linspace(0, height - 1, height,
+    v_indices = torch.linspace(-1, 1, height,
                                dtype=dtype, device=device)
     grid_v, grid_u = torch.meshgrid(v_indices, u_indices)
     grid_uv = torch.stack((grid_u, grid_v), dim=-1)
 
     # find bearing vectors
+    # principal_point is always at the center
     principal_point = intrinsics[:2, 2].type(dtype).to(device)
     focal_lengths = torch.tensor([intrinsics[0, 0], intrinsics[1, 1]],
                                  dtype=dtype, device=device)

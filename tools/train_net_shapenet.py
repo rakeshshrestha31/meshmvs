@@ -468,7 +468,7 @@ def save_predictions(model, loader, output_dir):
     for i in range(3):
         os.makedirs(os.path.join(output_dir, str(i)), exist_ok=True)
 
-    for batch in tqdm.tqdm(loader):
+    for loader_idx, batch in enumerate(tqdm.tqdm(loader)):
         batch = loader.postprocess(batch, device)
 
         model_kwargs = {}
@@ -492,6 +492,21 @@ def save_predictions(model, loader, output_dir):
             gt_mesh, NUM_GT_SURFACE_SAMPLES, return_normals=False
         )
         gt_points = gt_points.cpu().detach().numpy()
+
+        # save depth clouds
+        if loader_idx > 5:
+            break
+        for batch_idx, views in enumerate(model_outputs["depth_clouds"]):
+            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+            for view_idx, view in enumerate(views):
+                filename = os.path.join(
+                    output_dir,
+                    "{}_{}_{}_depthcloud.xyz" \
+                        .format(label, label_appendix, view_idx)
+                )
+                np.savetxt(
+                    filename, (view * P2M_SCALE).cpu().detach().numpy()
+                )
 
         # only the last stage
         gcn_stages = [len(model_outputs["meshes_pred"])-1]

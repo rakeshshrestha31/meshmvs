@@ -18,6 +18,7 @@ from shapenet.modeling.voxel_ops import \
         dummy_mesh, add_dummy_meshes, cubify, merge_multi_view_voxels, logit
 from shapenet.utils.coords import \
         get_blender_intrinsic_matrix, relative_extrinsics, get_initial_sphere_meshes
+from shapenet.utils.depth_backprojection import get_points_from_depths
 from shapenet.data.utils import imagenet_deprocess
 
 MESH_ARCH_REGISTRY = Registry("MESH_ARCH")
@@ -1034,7 +1035,16 @@ class VoxMeshDepthHead(VoxDepthHead):
             #     save_depths(rendered_depth, "%d_rendered_%d" % (timestamp, i))
             # exit(0)
 
-        return {**voxel_head_output, **mesh_head_output}
+        rel_extrinsics, _ \
+            = self.process_extrinsics(extrinsics, batch_size, device)
+        depth_clouds = get_points_from_depths(
+            voxel_head_output["masked_pred_depths"], intrinsics[0], rel_extrinsics
+        )
+        return {
+            **voxel_head_output,
+            **mesh_head_output,
+            'depth_clouds': depth_clouds
+        }
 
 
 @MESH_ARCH_REGISTRY.register()
