@@ -25,7 +25,8 @@ from shapenet.config import get_shapenet_cfg
 from shapenet.data import build_data_loader, register_shapenet
 from shapenet.evaluation import \
         evaluate_split, evaluate_test, evaluate_test_p2m, evaluate_vox
-from shapenet.utils.coords import relative_extrinsics
+from shapenet.utils.coords import relative_extrinsics, \
+        get_blender_intrinsic_matrix
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
@@ -565,40 +566,39 @@ def save_debug_predictions(batch, model_outputs):
     from shapenet.modeling.voxel_ops import cubify
     from shapenet.modeling.mesh_arch import save_depths
 
+    def save_meshes(meshes, id_strs, file_suffix):
+        for batch_idx in range(len(meshes)):
+            label, label_appendix = id_strs[batch_idx].split("-")[:2]
+            save_obj(
+                "/tmp/{}_{}_{}_{}.obj".format(
+                    label, label_appendix, view_idx, file_suffix
+                ),
+                meshes[batch_idx].verts_packed(),
+                meshes[batch_idx].faces_packed()
+            )
+
+
+    def save_cubified_voxels(voxels, id_strs, file_suffix):
+        cubified = cubify(voxels, 48, 0.2)
+        save_meshes(cubified, id_strs, file_suffix)
+
+
     batch_size = len(batch["id_strs"])
     if model_outputs.get("voxel_scores", None) is not None:
         for view_idx, voxels in enumerate(model_outputs["voxel_scores"]):
-            cubified = cubify(voxels, 48, 0.2)
-            for batch_idx in range(batch_size):
-                label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
-                save_obj(
-                    "/tmp/{}_{}_{}_multiview_vox.obj".format(
-                        label, label_appendix, view_idx
-                    ),
-                    cubified[batch_idx].verts_packed(),
-                    cubified[batch_idx].faces_packed()
-                )
-        merged_voxels = cubify(model_outputs["merged_voxel_scores"], 48, 0.2)
-        for batch_idx in range(batch_size):
-            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
-            save_obj(
-                "/tmp/{}_{}_merged_vox.obj".format(
-                    label, label_appendix
-                ),
-                merged_voxels[batch_idx].verts_packed(),
-                merged_voxels[batch_idx].faces_packed()
+            save_cubified_voxels(
+                voxels, batch["id_strs"], "{}_multiview_vox".format(view_idx)
             )
 
+        save_cubified_voxels(
+            model_outputs["merged_voxel_scores"], batch["id_strs"], "merged_vox"
+        )
+        save_cubified_voxels(
+            model_outputs["merged_voxel_scores_old"], batch["id_strs"], "merged_vox_old"
+        )
+
     if model_outputs.get("init_meshes", None) is not None:
-        for batch_idx in range(batch_size):
-            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
-            save_obj(
-                "/tmp/{}_{}_init_mesh.obj".format(
-                    label, label_appendix
-                ),
-                model_outputs["init_meshes"][0].verts_packed(),
-                model_outputs["init_meshes"][0].faces_packed()
-            )
+        save_meshes(model_outputs["init_meshes"], batch["id_strs"])
 
     for stage_idx, pred_mesh in enumerate(model_outputs["meshes_pred"]):
         for batch_idx in range(batch_size):
@@ -687,9 +687,7 @@ def save_backproj_depths(depths, id_strs, prefix):
     depths = F.interpolate(depths, (224, 224))
     dtype = depths.dtype
     device = depths.device
-    intrinsics = torch.tensor([
-        [248.0, 0.0, 111.5], [0.0, 248.0, 111.5], [0.0, 0.0, 1.0]
-    ], dtype=dtype, device=device)
+    intrinsics = get_blender_intrinsic_matrix().type(dtype).to(device)
     depth_points = get_points_from_depths(depths, intrinsics)
 
     for batch_idx in range(len(depth_points)):
