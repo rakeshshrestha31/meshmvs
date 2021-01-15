@@ -1021,44 +1021,6 @@ class VoxMeshDepthHead(VoxDepthHead):
                 masks, dummy_meshes, **kwargs
             )
         else:
-            rel_extrinsics, _ \
-                = self.process_extrinsics(extrinsics, batch_size, device)
-            depth_clouds_raw = get_points_from_depths(
-                voxel_head_output["masked_pred_depths"], intrinsics[0], rel_extrinsics
-            )
-            depth_clouds_struct = Pointclouds([
-                torch.cat(i, dim=0) for i in depth_clouds_raw
-            ])
-
-            voxel_size = self.voxel_head.voxel_size
-            norm_coords = voxel_grid_coords([voxel_size]*3)
-            grid_points = voxel_coords_to_world(
-                norm_coords.view(-1, 3)
-            ).view(1, -1, 3).expand(batch_size, -1, -1).to(device)
-
-            depth_vox_nn = knn_points(
-                grid_points, depth_clouds_struct.points_padded(),
-                lengths2=depth_clouds_struct.num_points_per_cloud(), K=1
-            )
-
-            voxel_width = (SHAPENET_MAX_ZMAX - SHAPENET_MIN_ZMIN) / float(voxel_size)
-            voxel_width_square = voxel_width ** 2
-            depth_vox_positive = depth_vox_nn.dists.view(batch_size, *([voxel_size]*3)) \
-                                < (voxel_width_square*8)
-            depth_vox_negative = ~depth_vox_positive
-            depth_vox_scores = \
-                depth_vox_positive.float() * (self.cubify_threshold_logit + 1e-1) \
-                + depth_vox_negative.float() * (self.cubify_threshold_logit - 1e-1)
-
-            voxel_head_output["merged_voxel_scores_old"] = voxel_head_output["merged_voxel_scores"]
-            voxel_head_output["merged_voxel_scores"] = depth_vox_scores
-            voxel_head_output["depth_clouds"] = depth_clouds_raw
-
-            # np.savetxt("/tmp/depth_vox.xyz", grid_points[0, depth_vox_positive.view(-1), :].cpu().detach().numpy())
-            # np.savetxt("/tmp/grid.xyz", grid_points[0, :, :].cpu().detach().numpy())
-            # np.savetxt("/tmp/depth_clouds.xyz", depth_clouds_struct.points_padded()[0].cpu().detach().numpy())
-            # exit(0)
-
             cubified_meshes = cubify(
                 voxel_head_output["merged_voxel_scores"],
                 self.voxel_size, self.cubify_threshold
@@ -1083,6 +1045,112 @@ class VoxMeshDepthHead(VoxDepthHead):
             **mesh_head_output
         }
 
+
+
+## TODO: the inheritance structure is shite now.
+## MeshDepthHead inherits from VoxMeshDepthHead but it should be opposite
+@MESH_ARCH_REGISTRY.register()
+class MeshDepthHead(VoxMeshDepthHead):
+    def __init__(self, cfg):
+        nn.Module.__init__(self)
+        self.setup(cfg)
+        self.init_mvsnet(cfg)
+        self.init_mesh_head(cfg)
+        self.cfg = cfg
+        self.register_buffer("K", get_blender_intrinsic_matrix())
+
+    def get_voxels_from_depths(self, depths, intrinsics, extrinsics):
+        batch_size = depths.shape[0]
+        num_views = depths.shape[1]
+        device = depths.device
+
+        rel_extrinsics, _ \
+            = self.process_extrinsics(extrinsics, batch_size, device)
+        depth_clouds_raw = get_points_from_depths(
+            depths, intrinsics[0], rel_extrinsics
+        )
+        depth_clouds_struct = Pointclouds([
+            torch.cat(i, dim=0) for i in depth_clouds_raw
+        ])
+
+        voxel_size = self.cfg.MODEL.VOXEL_HEAD.VOXEL_SIZE
+        norm_coords = voxel_grid_coords([voxel_size]*3)
+        grid_points = voxel_coords_to_world(
+            norm_coords.view(-1, 3)
+        ).view(1, -1, 3).expand(batch_size, -1, -1).to(device)
+
+        depth_vox_nn = knn_points(
+            grid_points, depth_clouds_struct.points_padded(),
+            lengths2=depth_clouds_struct.num_points_per_cloud(), K=1
+        )
+
+        voxel_width = (SHAPENET_MAX_ZMAX - SHAPENET_MIN_ZMIN) / float(voxel_size)
+        voxel_width_square = voxel_width ** 2
+        depth_vox_positive = depth_vox_nn.dists.view(batch_size, *([voxel_size]*3)) \
+                            < (voxel_width_square*8)
+        depth_vox_negative = ~depth_vox_positive
+        depth_vox_scores = \
+            depth_vox_positive.float() * (self.cubify_threshold_logit + 1e-1) \
+            + depth_vox_negative.float() * (self.cubify_threshold_logit - 1e-1)
+
+        # debugging
+        # np.savetxt(
+        #     "/tmp/depth_vox.xyz",
+        #     grid_points[0, depth_vox_positive[0].view(-1), :] \
+        #         .cpu().detach().numpy()
+        # )
+        # np.savetxt(
+        #     "/tmp/grid.xyz",
+        #     grid_points[0, :, :].cpu().detach().numpy()
+        # )
+        # np.savetxt(
+        #     "/tmp/depth_clouds.xyz",
+        #     depth_clouds_struct.points_padded()[0].cpu().detach().numpy()
+        # )
+        # exit(0)
+
+        return {
+            "voxel_scores": None,
+            "merged_voxel_scores": depth_vox_scores,
+            "depth_clouds": depth_clouds_raw
+        }
+
+    def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
+        """
+        Args:
+        - imgs: tensor of shape (B, V, 3, H, W)
+        - intrinsics: tensor of shape (B, V, 4, 4)
+        - extrinsics: tensor of shape (B, V, 4, 4)
+        """
+        batch_size = imgs.shape[0]
+        num_views = imgs.shape[1]
+        device = imgs.device
+
+        depths, masked_depths = self.predict_depths(
+            imgs, masks, extrinsics, **kwargs
+        )
+
+        voxels_from_depths = self.get_voxels_from_depths(
+            masked_depths, intrinsics, extrinsics
+        )
+
+        cubified_meshes = cubify(
+            voxels_from_depths["merged_voxel_scores"],
+            self.voxel_size, self.cubify_threshold
+        )
+
+        mesh_head_output = self.forward_mesh_head(
+            imgs, masked_depths,
+            intrinsics, extrinsics,
+            masks, cubified_meshes, **kwargs
+        )
+
+        return {
+            **mesh_head_output, **voxels_from_depths,
+            "init_meshes": cubified_meshes,
+            "pred_depths": depths,
+            "masked_pred_depths": masked_depths
+        }
 
 @MESH_ARCH_REGISTRY.register()
 class SphereMeshDepthHead(VoxMeshDepthHead):
