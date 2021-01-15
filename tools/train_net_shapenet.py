@@ -489,7 +489,6 @@ def save_predictions(model, loader, output_dir):
         # if loader_idx > 2:
         #     break
 
-
         gt_mesh = batch["meshes"]
         gt_mesh = gt_mesh.scale_verts(P2M_SCALE)
         gt_points = sample_points_from_meshes(
@@ -498,17 +497,17 @@ def save_predictions(model, loader, output_dir):
         gt_points = gt_points.cpu().detach().numpy()
 
         # save depth clouds
-        for batch_idx, views in enumerate(model_outputs.get("depth_clouds", [])):
-            label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
-            for view_idx, view in enumerate(views):
-                filename = os.path.join(
-                    output_dir,
-                    "{}_{}_{}_depthcloud.xyz" \
-                        .format(label, label_appendix, view_idx)
-                )
-                np.savetxt(
-                    filename, (view * P2M_SCALE).cpu().detach().numpy()
-                )
+        # for batch_idx, views in enumerate(model_outputs.get("depth_clouds", [])):
+        #     label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
+        #     for view_idx, view in enumerate(views):
+        #         filename = os.path.join(
+        #             output_dir,
+        #             "{}_{}_{}_depthcloud.xyz" \
+        #                 .format(label, label_appendix, view_idx)
+        #         )
+        #         np.savetxt(
+        #             filename, (view * P2M_SCALE).cpu().detach().numpy()
+        #         )
 
         # only the last stage
         gcn_stages = [len(model_outputs["meshes_pred"])-1]
@@ -541,15 +540,15 @@ def save_predictions(model, loader, output_dir):
                 )
                 np.savetxt(gt_filename, gt_points[batch_idx])
 
-                pred_filename = pred_filename.replace(".xyz", ".obj")
-                gt_filename = gt_filename.replace(".xyz", ".obj")
+                # pred_filename = pred_filename.replace(".xyz", ".obj")
+                # gt_filename = gt_filename.replace(".xyz", ".obj")
 
-                pred_verts, pred_faces = pred_mesh[batch_idx] \
-                                            .get_mesh_verts_faces(0)
-                gt_verts, gt_faces = gt_mesh[batch_idx] \
-                                        .get_mesh_verts_faces(0)
-                save_obj(pred_filename, pred_verts, pred_faces)
-                save_obj(gt_filename, gt_verts, gt_faces)
+                # pred_verts, pred_faces = pred_mesh[batch_idx] \
+                #                             .get_mesh_verts_faces(0)
+                # gt_verts, gt_faces = gt_mesh[batch_idx] \
+                #                         .get_mesh_verts_faces(0)
+                # save_obj(pred_filename, pred_verts, pred_faces)
+                # save_obj(gt_filename, gt_verts, gt_faces)
 
                 # metrics = compare_meshes(
                 #     pred_mesh[batch_idx], gt_mesh[batch_idx],
