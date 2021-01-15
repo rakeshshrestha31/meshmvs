@@ -486,6 +486,9 @@ def save_predictions(model, loader, output_dir):
         # TODO: debug only
         # save_debug_predictions(batch, model_outputs)
         # continue
+        # if loader_idx > 2:
+        #     break
+
 
         gt_mesh = batch["meshes"]
         gt_mesh = gt_mesh.scale_verts(P2M_SCALE)
@@ -495,9 +498,7 @@ def save_predictions(model, loader, output_dir):
         gt_points = gt_points.cpu().detach().numpy()
 
         # save depth clouds
-        if loader_idx > 5:
-            break
-        for batch_idx, views in enumerate(model_outputs["depth_clouds"]):
+        for batch_idx, views in enumerate(model_outputs.get("depth_clouds", [])):
             label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
             for view_idx, view in enumerate(views):
                 filename = os.path.join(
