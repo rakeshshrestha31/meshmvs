@@ -1056,8 +1056,41 @@ class MeshDepthHead(VoxMeshDepthHead):
         self.setup(cfg)
         self.init_mvsnet(cfg)
         self.init_mesh_head(cfg)
+        self.noise_filter_size = cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_SIZE
+        self.noise_filter_padding = (self.noise_filter_size -1) // 2
+        self.noise_filter_threshold = cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_THRESHOLD
         self.cfg = cfg
         self.register_buffer("K", get_blender_intrinsic_matrix())
+
+    def binary_grid_to_logit(self, binary_grid):
+        negative_grid = ~binary_grid
+        return binary_grid.float() * (self.cubify_threshold_logit + 1e-1) \
+                + negative_grid.float() * (self.cubify_threshold_logit - 1e-1)
+
+    def noise_filter_voxel_grid(self, voxel_grid):
+        """
+        @param voxel_grid: voxel grid with logit values
+        """
+        binary_grid = (voxel_grid > self.cubify_threshold_logit).float()
+
+        # counts occupied neighbors of each voxel
+        conv_weight = torch.ones(
+            1, 1, *([self.noise_filter_size]*3),
+            dtype=voxel_grid.dtype, device=voxel_grid.device
+        )
+        neighbor_counts = F.conv3d(
+            binary_grid.unsqueeze(1), conv_weight,
+            padding=self.noise_filter_padding
+        ).squeeze(1)
+
+        neighbor_filtered_grid = (
+            neighbor_counts >= self.noise_filter_threshold
+        ).float()
+
+        # final points are where the neighbors are sufficent and was originally occupied
+        filtered_grid = neighbor_filtered_grid * binary_grid
+        logit_grid = self.binary_grid_to_logit(filtered_grid > 0)
+        return logit_grid
 
     def get_voxels_from_depths(self, depths, intrinsics, extrinsics):
         batch_size = depths.shape[0]
@@ -1088,17 +1121,57 @@ class MeshDepthHead(VoxMeshDepthHead):
         voxel_width_square = voxel_width ** 2
         depth_vox_positive = depth_vox_nn.dists.view(batch_size, *([voxel_size]*3)) \
                             < (voxel_width_square*8)
-        depth_vox_negative = ~depth_vox_positive
-        depth_vox_scores = \
-            depth_vox_positive.float() * (self.cubify_threshold_logit + 1e-1) \
-            + depth_vox_negative.float() * (self.cubify_threshold_logit - 1e-1)
+        depth_vox_scores = self.binary_grid_to_logit(depth_vox_positive)
+        filtered_vox_scores = self.noise_filter_voxel_grid(depth_vox_scores)
 
         # debugging
+        self.save_voxels(depth_vox_scores, filtered_vox_scores)
+        exit(0)
+
+        return {
+            "voxel_scores": None,
+            "merged_voxel_scores": depth_vox_scores,
+            "depth_clouds": depth_clouds_raw
+        }
+
+    def save_voxels(self, depth_vox_scores, filtered_vox_scores):
+        import pytorch3d.io
+        depth_vox_positive = depth_vox_scores > self.cubify_threshold_logit
+        filtered_vox_positive = filtered_vox_scores > self.cubify_threshold_logit
+        print("before filter:", torch.sum(depth_vox_positive[0]).item())
+        print("after filter:", torch.sum(filtered_vox_positive[0]).item())
+
+        # save cubified meshes
+        def save_meshes(meshes, file_prefix):
+            for batch_idx in range(len(meshes)):
+                pytorch3d.io.save_obj(
+                    "/tmp/{}_{}.obj".format(
+                        file_prefix, batch_idx
+                    ),
+                    meshes[batch_idx].verts_packed(),
+                    meshes[batch_idx].faces_packed()
+                )
+        timestamp = int(time.time() * 1000)
+        depth_vox_cubified = cubify(
+            depth_vox_scores, self.voxel_size, self.cubify_threshold
+        )
+        filtered_vox_cubified = cubify(
+            filtered_vox_scores, self.voxel_size, self.cubify_threshold
+        )
+        save_meshes(depth_vox_cubified, "{}_original".format(timestamp))
+        save_meshes(filtered_vox_cubified, "{}_filtered".format(timestamp))
+
         # np.savetxt(
         #     "/tmp/depth_vox.xyz",
         #     grid_points[0, depth_vox_positive[0].view(-1), :] \
         #         .cpu().detach().numpy()
         # )
+        # np.savetxt(
+        #     "/tmp/filtered_depth_vox.xyz",
+        #     grid_points[0, filtered_vox_positive[0].view(-1), :] \
+        #         .cpu().detach().numpy()
+        # )
+
         # np.savetxt(
         #     "/tmp/grid.xyz",
         #     grid_points[0, :, :].cpu().detach().numpy()
@@ -1107,13 +1180,6 @@ class MeshDepthHead(VoxMeshDepthHead):
         #     "/tmp/depth_clouds.xyz",
         #     depth_clouds_struct.points_padded()[0].cpu().detach().numpy()
         # )
-        # exit(0)
-
-        return {
-            "voxel_scores": None,
-            "merged_voxel_scores": depth_vox_scores,
-            "depth_clouds": depth_clouds_raw
-        }
 
     def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
         """
