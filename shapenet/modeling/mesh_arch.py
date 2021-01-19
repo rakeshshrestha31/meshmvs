@@ -1078,13 +1078,13 @@ class MeshDepthHead(VoxMeshDepthHead):
             1, 1, *([self.noise_filter_size]*3),
             dtype=voxel_grid.dtype, device=voxel_grid.device
         )
-        neighbor_counts = F.conv3d(
+        neighbor_frac = F.conv3d(
             binary_grid.unsqueeze(1), conv_weight,
             padding=self.noise_filter_padding
-        ).squeeze(1)
+        ).squeeze(1) / self.noise_filter_size**3
 
         neighbor_filtered_grid = (
-            neighbor_counts >= self.noise_filter_threshold
+            neighbor_frac >= self.noise_filter_threshold
         ).float()
 
         # final points are where the neighbors are sufficent and was originally occupied
@@ -1125,8 +1125,8 @@ class MeshDepthHead(VoxMeshDepthHead):
         filtered_vox_scores = self.noise_filter_voxel_grid(depth_vox_scores)
 
         # debugging
-        self.save_voxels(depth_vox_scores, filtered_vox_scores)
-        exit(0)
+        # self.save_voxels(depth_vox_scores, filtered_vox_scores)
+        # exit(0)
 
         return {
             "voxel_scores": None,
