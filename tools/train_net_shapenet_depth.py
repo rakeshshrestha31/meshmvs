@@ -181,12 +181,22 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
 
             with Timer("Forward"):
                 model_outputs = model(batch["imgs"], **model_kwargs)
-                pred_depths = model_outputs["depths"]
 
-            loss = loss_fn(
-                batch["depths"], pred_depths, batch["masks"]
-            )
-            losses = {"pred_depth": loss}
+            loss = torch.tensor(0.0).to(model_outputs["depths"])
+            losses = {}
+            if "unrefined_depths" in model_outputs:
+                losses["unrefined_depths"] = loss_fn(
+                    batch["depths"], model_outputs["unrefined_depths"],
+                    batch["masks"]
+                )
+                loss += losses["unrefined_depths"]
+            if "refined_depths" in model_outputs:
+                losses["refined_depths"] = loss_fn(
+                    batch["depths"], model_outputs["refined_depths"],
+                    batch["masks"]
+                )
+                loss += losses["refined_depths"]
+            losses["total_depths"] = loss
 
             skip = loss is None
             if loss is None or (torch.isfinite(loss) == 0).sum().item() > 0:

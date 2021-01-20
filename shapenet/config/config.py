@@ -93,6 +93,7 @@ def get_shapenet_cfg():
     # the depths here are not scaled by the factor 0.57 here
     cfg.MODEL.MVSNET.MIN_DEPTH = 0.175
     cfg.MODEL.MVSNET.DEPTH_INTERVAL = 0.044
+    cfg.MODEL.MVSNET.DEPTH_REFINE = True
 
     cfg.MODEL.MVSNET.NUM_DEPTHS = 48
     cfg.MODEL.MVSNET.INPUT_IMAGE_SIZE = (224, 224)

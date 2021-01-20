@@ -86,6 +86,21 @@ def homo_warping(src_fea, src_proj, ref_proj, depth_values):
     return warped_src_fea
 
 
+class RefineNet(nn.Module):
+    def __init__(self):
+        super(RefineNet, self).__init__()
+        self.conv1 = ConvBnReLU(4, 32)
+        self.conv2 = ConvBnReLU(32, 32)
+        self.conv3 = ConvBnReLU(32, 32)
+        self.res = ConvBnReLU(32, 1)
+
+    def forward(self, img, depth_init):
+        concat = torch.cat((img, depth_init), dim=1)
+        depth_residual = self.res(self.conv3(self.conv2(self.conv1(concat))))
+        depth_refined = depth_init + depth_residual
+        return depth_refined
+
+
 class MVSNet(nn.Module):
     def __init__(self, cfg):
         super(MVSNet, self).__init__()
@@ -104,6 +119,8 @@ class MVSNet(nn.Module):
 
         self.feature = VGG16P2M()
         self.cost_regularization = CostRegNet(cfg.FEATURES_LIST)
+        if cfg.DEPTH_REFINE:
+            self.refine_network = RefineNet()
 
         # self.features_dim = 960# + 191
         # self.features_dim = 384
@@ -221,22 +238,41 @@ class MVSNet(nn.Module):
             proj_matrices, imgs.size()[-2:], features[0][0].size()[-2:]
         )
 
-        costvolume_outputs = {'features': [], 'depths': []}
+        depth_keys = ['depths', 'unrefined_depths']
+        if hasattr(self, 'refine_network'):
+            depth_keys.append('refined_depths')
+
+        costvolume_outputs = {
+            'features': [], **{i: [] for i in depth_keys}
+        }
 
         for view_list in view_lists:
             reordered_features = [features[i] for i in view_list]
             reordered_proj_matrices = [proj_matrices[:, i] for i in view_list]
+            reordered_imgs = [imgs[:, i] for i in view_list]
             costvolume_output = self.compute_costvolume_depth(
-                reordered_features, reordered_proj_matrices, depth_values
+                reordered_imgs, reordered_features, reordered_proj_matrices, depth_values
             )
             # costvolume_outputs['features'].append(costvolume_output['features'])
-            costvolume_outputs['depths'].append(costvolume_output['depth'])
+            for depth_key in depth_keys:
+                # depth_key: '*depths', depth_key[:-1]: '*depth'
+                costvolume_outputs[depth_key].append(costvolume_output[depth_key[:-1]])
 
-        costvolume_outputs['depths'] = torch.stack(costvolume_outputs['depths'],
-                                                   dim=1)
+        for depth_key in depth_keys:
+            costvolume_outputs[depth_key] = torch.stack(
+                costvolume_outputs[depth_key], dim=1
+            )
+
         return costvolume_outputs
 
-    def compute_costvolume_depth(self, features, proj_matrices, depth_values):
+    def compute_costvolume_depth(self, imgs, features, proj_matrices, depth_values):
+        """
+        @return unrefined_depth: depth regressed from costvolume
+        @return refined_depth: depth after refinement
+                               None if cfg.MVSNET.DEPTH_REFINE False
+        @return depth: final depth to be used
+                       based on where DEPTH_REFINE True or False
+        """
         num_views = len(features)
         num_depth = depth_values.shape[1]
 
@@ -280,8 +316,23 @@ class MVSNet(nn.Module):
         cost_reg = cost_reg.squeeze(1)
         prob_volume = F.softmax(cost_reg, dim=1)
         depth = depth_regression(prob_volume, depth_values=depth_values)
+
+        refined_depth = None
+        if hasattr(self, "refine_network"):
+            resized_depth = F.interpolate(
+                depth.unsqueeze(1), imgs[0].shape[-2:], mode="nearest"
+            )
+            refined_depth = self.refine_network(
+                imgs[0], resized_depth
+            ).squeeze(1)
+
         # add cost aggregated feature
-        return {"features": cost_agg_feature, "depth": depth}
+        return {
+            "features": cost_agg_feature,
+            "unrefined_depth": depth,
+            "refined_depth": refined_depth,
+            "depth": refined_depth if refined_depth is not None else depth
+        }
 
 
 class VGG16P2M(nn.Module):
@@ -332,6 +383,16 @@ class VGG16P2M(nn.Module):
         img2 = img
 
         return [img2]
+
+
+class ConvBnReLU(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, pad=1):
+        super(ConvBnReLU, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=pad, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        return F.relu(self.bn(self.conv(x)), inplace=True)
 
 
 class ConvBnReLU3D(nn.Module):
