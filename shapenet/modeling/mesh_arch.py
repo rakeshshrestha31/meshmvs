@@ -1130,7 +1130,7 @@ class MeshDepthHead(VoxMeshDepthHead):
 
         return {
             "voxel_scores": None,
-            "merged_voxel_scores": depth_vox_scores,
+            "merged_voxel_scores": filtered_vox_scores,
             "depth_clouds": depth_clouds_raw
         }
 
