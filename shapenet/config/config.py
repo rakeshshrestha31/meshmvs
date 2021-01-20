@@ -52,6 +52,7 @@ def get_shapenet_cfg():
     cfg.MODEL.VOXEL_HEAD.DEPTH_FEATURES_INPUT = True
     cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE = "resnet50"
     cfg.MODEL.VOXEL_HEAD.DEPTH_BACKBONE = "vgg"
+    cfg.MODEL.VOXEL_HEAD.NOISE_FILTERING = False
     cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_SIZE = 3
     # threshold in fraction, range [0.0, 1.0]
     cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_THRESHOLD = 0.33

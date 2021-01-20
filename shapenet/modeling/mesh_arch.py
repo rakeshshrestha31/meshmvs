@@ -1194,10 +1194,12 @@ class MeshDepthHead(VoxMeshDepthHead):
             depths, intrinsics, extrinsics
         )
 
-        filtered_vox_scores = voxels_from_depths["voxel_scores"]
-        # filtered_vox_scores = self.noise_filter_voxel_grid(
-        #     voxels_from_depths["voxel_scores"]
-        # )
+        if self.cfg.MODEL.VOXEL_HEAD.NOISE_FILTERING:
+            vox_scores = self.noise_filter_voxel_grid(
+                voxels_from_depths["voxel_scores"]
+            )
+        else:
+            vox_scores = voxels_from_depths["voxel_scores"]
 
         # debugging
         # voxels_from_depths2 = self.get_voxels_from_depths(
@@ -1213,7 +1215,7 @@ class MeshDepthHead(VoxMeshDepthHead):
         # exit(0)
 
         cubified_meshes = cubify(
-            filtered_vox_scores,
+            vox_scores,
             self.voxel_size, self.cubify_threshold
         )
 
@@ -1229,7 +1231,7 @@ class MeshDepthHead(VoxMeshDepthHead):
             "pred_depths": depths,
             "masked_pred_depths": masked_depths,
             "voxel_scores": None,
-            "merged_voxel_scores": filtered_vox_scores,
+            "merged_voxel_scores": vox_scores,
             "depth_clouds": voxels_from_depths["depth_clouds"]
         }
 
