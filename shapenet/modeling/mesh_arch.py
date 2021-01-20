@@ -416,7 +416,14 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         batch_size, num_views = mvsnet_output["depths"].shape[:2]
         depths = depths.view(batch_size, num_views, *(depths.shape[-2:]))
 
-        return mvsnet_output["depths"], depths
+        # unresized depth with mask
+        unresized_mask = self.interpolate_multiview_depth(
+            masks, mvsnet_output["depths"].shape[-2:]
+        ).view(*mvsnet_output["depths"].shape)
+        unresized_masked_depths =  mvsnet_output["depths"] * unresized_mask
+
+        # return mvsnet_output["depths"], depths
+        return unresized_masked_depths, depths
 
     def extract_rgb_features(self, imgs, feature_extractor):
         if feature_extractor is not None:
@@ -1122,24 +1129,16 @@ class MeshDepthHead(VoxMeshDepthHead):
         depth_vox_positive = depth_vox_nn.dists.view(batch_size, *([voxel_size]*3)) \
                             < (voxel_width_square*8)
         depth_vox_scores = self.binary_grid_to_logit(depth_vox_positive)
-        filtered_vox_scores = self.noise_filter_voxel_grid(depth_vox_scores)
-
-        # debugging
-        # self.save_voxels(depth_vox_scores, filtered_vox_scores)
-        # exit(0)
 
         return {
-            "voxel_scores": None,
-            "merged_voxel_scores": filtered_vox_scores,
+            "voxel_scores": depth_vox_scores, # filtered_vox_scores,
             "depth_clouds": depth_clouds_raw
         }
 
-    def save_voxels(self, depth_vox_scores, filtered_vox_scores):
+    def save_voxels(self, depth_vox_scores, file_prefix):
         import pytorch3d.io
         depth_vox_positive = depth_vox_scores > self.cubify_threshold_logit
-        filtered_vox_positive = filtered_vox_scores > self.cubify_threshold_logit
-        print("before filter:", torch.sum(depth_vox_positive[0]).item())
-        print("after filter:", torch.sum(filtered_vox_positive[0]).item())
+        # print("voxel points:", torch.sum(depth_vox_positive[0]).item())
 
         # save cubified meshes
         def save_meshes(meshes, file_prefix):
@@ -1151,15 +1150,10 @@ class MeshDepthHead(VoxMeshDepthHead):
                     meshes[batch_idx].verts_packed(),
                     meshes[batch_idx].faces_packed()
                 )
-        timestamp = int(time.time() * 1000)
         depth_vox_cubified = cubify(
             depth_vox_scores, self.voxel_size, self.cubify_threshold
         )
-        filtered_vox_cubified = cubify(
-            filtered_vox_scores, self.voxel_size, self.cubify_threshold
-        )
-        save_meshes(depth_vox_cubified, "{}_original".format(timestamp))
-        save_meshes(filtered_vox_cubified, "{}_filtered".format(timestamp))
+        save_meshes(depth_vox_cubified, file_prefix)
 
         # np.savetxt(
         #     "/tmp/depth_vox.xyz",
@@ -1197,11 +1191,29 @@ class MeshDepthHead(VoxMeshDepthHead):
         )
 
         voxels_from_depths = self.get_voxels_from_depths(
-            masked_depths, intrinsics, extrinsics
+            depths, intrinsics, extrinsics
         )
 
+        filtered_vox_scores = voxels_from_depths["voxel_scores"]
+        # filtered_vox_scores = self.noise_filter_voxel_grid(
+        #     voxels_from_depths["voxel_scores"]
+        # )
+
+        # debugging
+        # voxels_from_depths2 = self.get_voxels_from_depths(
+        #     masked_depths, intrinsics, extrinsics
+        # )
+        # timestamp = int(time.time() * 1000)
+        # self.save_voxels(
+        #     voxels_from_depths["voxel_scores"], "{}_original".format(timestamp)
+        # )
+        # self.save_voxels(
+        #     voxels_from_depths2["voxel_scores"], "{}_resized".format(timestamp)
+        # )
+        # exit(0)
+
         cubified_meshes = cubify(
-            voxels_from_depths["merged_voxel_scores"],
+            filtered_vox_scores,
             self.voxel_size, self.cubify_threshold
         )
 
@@ -1212,10 +1224,13 @@ class MeshDepthHead(VoxMeshDepthHead):
         )
 
         return {
-            **mesh_head_output, **voxels_from_depths,
+            **mesh_head_output,
             "init_meshes": cubified_meshes,
             "pred_depths": depths,
-            "masked_pred_depths": masked_depths
+            "masked_pred_depths": masked_depths,
+            "voxel_scores": None,
+            "merged_voxel_scores": filtered_vox_scores,
+            "depth_clouds": voxels_from_depths["depth_clouds"]
         }
 
 @MESH_ARCH_REGISTRY.register()
