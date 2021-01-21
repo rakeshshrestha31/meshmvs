@@ -63,13 +63,14 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
             print('depth file not found:', depth_file)
             exit(1)
 
-    @staticmethod
-    def read_mask(data_dir, sid, mid, img_path):
-        img_path = os.path.join(data_dir, sid, mid, "images", img_path)
-        rgbda_img = cv2.imread(img_path, -1)
-        mask = rgbda_img[:, :, -1]
-        mask = mask > 1e-7
-        return torch.from_numpy(mask).float()
+    # using alpha channel leads to noisy mask
+    # @staticmethod
+    # def read_mask(data_dir, sid, mid, img_path):
+    #     img_path = os.path.join(data_dir, sid, mid, "images", img_path)
+    #     rgbda_img = cv2.imread(img_path, -1)
+    #     mask = rgbda_img[:, :, -1]
+    #     mask = mask > 1e-7
+    #     return torch.from_numpy(mask).float()
 
     def __getitem__(self, idx):
         sid = self.synset_ids[idx]
