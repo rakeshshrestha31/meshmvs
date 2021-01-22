@@ -405,25 +405,17 @@ class VoxDepthHead(VoxMeshMultiViewHead):
         else:
             mvsnet_output = self.mvsnet(imgs, extrinsics)
 
-        # (B*V, 1, H, W)
-        depths = self.interpolate_multiview_depth(
-            mvsnet_output["depths"], img_size
-        )
-        masks = self.interpolate_multiview_depth(masks, img_size)
-        depths = depths * masks
+        if masks.shape[-2:] != mvsnet_output["depths"].shape[-2:]:
+            resized_masks = self.interpolate_multiview_depth(
+                masks, mvsnet_output["depths"].shape[-2:]
+            ).view(*mvsnet_output["depths"].shape)
+        else:
+            resized_masks = masks
 
-        # (B, V, H, W)
-        batch_size, num_views = mvsnet_output["depths"].shape[:2]
-        depths = depths.view(batch_size, num_views, *(depths.shape[-2:]))
+        # masked depths
+        masked_depths =  mvsnet_output["depths"] * resized_masks
 
-        # unresized depth with mask
-        unresized_mask = self.interpolate_multiview_depth(
-            masks, mvsnet_output["depths"].shape[-2:]
-        ).view(*mvsnet_output["depths"].shape)
-        unresized_masked_depths =  mvsnet_output["depths"] * unresized_mask
-
-        # return mvsnet_output["depths"], depths
-        return unresized_masked_depths, depths
+        return mvsnet_output["depths"], masked_depths
 
     def extract_rgb_features(self, imgs, feature_extractor):
         if feature_extractor is not None:
@@ -1191,7 +1183,7 @@ class MeshDepthHead(VoxMeshDepthHead):
         )
 
         voxels_from_depths = self.get_voxels_from_depths(
-            depths, intrinsics, extrinsics
+            masked_depths, intrinsics, extrinsics
         )
 
         if self.cfg.MODEL.VOXEL_HEAD.NOISE_FILTERING:
@@ -1202,16 +1194,20 @@ class MeshDepthHead(VoxMeshDepthHead):
             vox_scores = voxels_from_depths["voxel_scores"]
 
         # debugging
-        # voxels_from_depths2 = self.get_voxels_from_depths(
-        #     masked_depths, intrinsics, extrinsics
-        # )
         # timestamp = int(time.time() * 1000)
         # self.save_voxels(
-        #     voxels_from_depths["voxel_scores"], "{}_original".format(timestamp)
+        #     voxels_from_depths["voxel_scores"], "{}_refined".format(timestamp)
         # )
-        # self.save_voxels(
-        #     voxels_from_depths2["voxel_scores"], "{}_resized".format(timestamp)
-        # )
+
+        # # voxels_from_depths2 = self.get_voxels_from_depths(
+        # #     depths, intrinsics, extrinsics
+        # # )
+        # # self.save_voxels(
+        # #     voxels_from_depths2["voxel_scores"], "{}_raw".format(timestamp)
+        # # )
+        # save_images(imgs, "{}_input_image".format(timestamp))
+        # save_depths(depths, "{}_depth".format(timestamp))
+        # save_depths(masked_depths, "{}_masked_depth".format(timestamp))
         # exit(0)
 
         cubified_meshes = cubify(
