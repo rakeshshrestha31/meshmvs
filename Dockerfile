@@ -7,12 +7,15 @@ RUN . /opt/conda/etc/profile.d/conda.sh && \
 
 ENV FORCE_CUDA=1
 COPY requirements.txt /root/
+COPY requirements2.txt /root/
 COPY requirements2.txt /root/meshmvs_requirements2.txt
 RUN . /opt/conda/etc/profile.d/conda.sh && \
     conda activate base && \
     conda install pip && \
     pip install -r /root/requirements.txt
+RUN pip install -r /root/requirements2.txt
 RUN rm /root/requirements.txt
+RUN rm /root/requirements2.txt
 
 
 ## install dependancy
