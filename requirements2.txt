@@ -1,0 +1,4 @@
+git+https://github.com/rakeshshrestha31/neural_renderer.git
+git+https://github.com/facebookresearch/pytorch3d.git@677b0bd5aecb3069e3e8d4de41656f786cfa4312
+git+git://github.com/facebookresearch/detectron2.git@e6e2a7
+

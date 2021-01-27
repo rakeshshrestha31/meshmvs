@@ -1,0 +1,9 @@
+numpy
+scipy
+scikit-image
+opencv-python
+cython
+fvcore
+open3d==0.9
+pycocotools==2.0.1
+tqdm

@@ -1,0 +1,20 @@
+FROM pytorch/pytorch:1.4-cuda10.1-cudnn7-devel
+
+## config admin account info
+RUN groupadd -r -g 505 admin && useradd --no-log-init -m -r -g 505 -u 505 admin -s /bin/bash -p admin && mkdir -p /data && chown -fR admin:admin /data && \
+echo admin:admin | chpasswd
+
+
+## install dependancy
+RUN apt-get update
+RUN pip install jupyterlab  -i http://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+RUN apt-get install -y \
+    libsm6 libxext6 libxrender-dev \
+    libgl1 libstdc++6 \
+    openssh-server bc apt-transport-https \
+    sudo libgl1-mesa-glx libglib2.0-0
+
+USER admin
+
+
+CMD ["/bin/bash","-c","tail -f /dev/null"]
