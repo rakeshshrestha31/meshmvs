@@ -1019,6 +1019,7 @@ class VoxMeshDepthHead(VoxDepthHead):
                 intrinsics, extrinsics,
                 masks, dummy_meshes, **kwargs
             )
+            cubified_meshes = dummy_meshes
         else:
             cubified_meshes = cubify(
                 voxel_head_output["merged_voxel_scores"],
@@ -1041,7 +1042,8 @@ class VoxMeshDepthHead(VoxDepthHead):
 
         return {
             **voxel_head_output,
-            **mesh_head_output
+            **mesh_head_output,
+            "init_meshes": cubified_meshes,
         }
 
 
