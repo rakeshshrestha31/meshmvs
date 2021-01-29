@@ -8,6 +8,7 @@ import shutil
 import time
 import numpy as np
 import tqdm
+import json
 
 import detectron2.utils.comm as comm
 import torch
@@ -123,17 +124,29 @@ def main_worker_eval(worker_id, args):
         for k, v in test_metrics.items():
             str_out += "%s %.4f " % (k, v)
         logger.info(str_out)
+    elif args.eval_p2m:
+        test_metrics = evaluate_test_p2m(model, test_loader)
+
+        file_path = os.path.join(cfg.OUTPUT_DIR, "object_f_scores.json")
+        with open(file_path, "w") as f:
+            json.dump({
+                key: value.tolist()
+                for key, value in test_metrics["object_f_scores"].items()
+            }, f, indent=4)
+
+        file_path = os.path.join(cfg.OUTPUT_DIR, "sum_f_scores.json")
+        with open(file_path, "w") as f:
+            json.dump({
+                key: value.tolist()
+                for key, value in test_metrics["sum_f_scores"].items()
+            }, f, indent=4)
     else:
         prediction_dir = os.path.join(
             cfg.OUTPUT_DIR, "predictions", "eval", "predict"
         )
         save_predictions(model, test_loader, prediction_dir)
-    exit(0)
-
-    if args.eval_p2m:
-        evaluate_test_p2m(model, test_loader)
-    else:
-        evaluate_test(model, test_loader)
+    # else:
+    #     evaluate_test(model, test_loader)
 
 
 def main_worker(worker_id, args):

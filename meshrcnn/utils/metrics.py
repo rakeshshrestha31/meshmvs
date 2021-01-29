@@ -1,11 +1,62 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import logging
 from collections import defaultdict
+import numpy as np
 import torch
 import torch.nn.functional as F
 from pytorch3d.ops import knn_gather, knn_points, sample_points_from_meshes
 
 logger = logging.getLogger(__name__)
+
+
+@torch.no_grad()
+def compare_meshes_p2m(
+    pred_meshes, gt_meshes, thresholds=[0.00005, 0.00010, 0.00015, 0.00020]
+):
+    len_gt_points = 9000
+    len_pred_points = 6466
+
+    gt_meshes = gt_meshes.scale_verts(0.57)
+    gt_points = sample_points_from_meshes(
+        gt_meshes, len_gt_points, return_normals=False
+    )
+
+    pred_meshes = pred_meshes.scale_verts(0.57)
+    pred_points = sample_points_from_meshes(
+        pred_meshes, len_pred_points, return_normals=False
+    )
+
+    return compare_points_p2m(pred_points, gt_points)
+
+@torch.no_grad()
+def compare_points_p2m(
+    pred_points, gt_points, thresholds=[0.00005, 0.00010, 0.00015, 0.00020]
+):
+    lengths_pred = torch.full(
+        (pred_points.shape[0],), pred_points.shape[1], dtype=torch.int64, device=pred_points.device
+    )
+    lengths_gt = torch.full(
+        (gt_points.shape[0],), gt_points.shape[1], dtype=torch.int64, device=gt_points.device
+    )
+
+    # For each predicted point, find its neareast-neighbor GT point
+    knn_pred = knn_points(pred_points, gt_points, lengths1=lengths_pred, lengths2=lengths_gt, K=1)
+    # Compute L1 and L2 distances between each pred point and its nearest GT
+    pred_to_gt_dists2 = knn_pred.dists[..., 0]  # (N, S)
+
+    # For each GT point, find its nearest-neighbor predicted point
+    knn_gt = knn_points(gt_points, pred_points, lengths1=lengths_gt, lengths2=lengths_pred, K=1)
+    # Compute L1 and L2 dists between each GT point and its nearest pred point
+    gt_to_pred_dists2 = knn_gt.dists[..., 0]  # (N, S)
+
+    f_scores = []
+    for t in thresholds:
+        precision = 100.0 * (pred_to_gt_dists2 < t).float().mean(dim=1)
+        recall = 100.0 * (gt_to_pred_dists2 < t).float().mean(dim=1)
+        f1 = (2.0 * precision * recall) / (precision + recall + 1e-8)
+        f_scores.append(f1.item())
+
+    return {"f_scores": np.asarray(f_scores)}
 
 
 @torch.no_grad()

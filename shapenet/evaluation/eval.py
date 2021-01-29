@@ -10,7 +10,7 @@ import torch
 from detectron2.evaluation import inference_context
 from pytorch3d.ops import sample_points_from_meshes
 
-from meshrcnn.utils.metrics import compare_meshes
+from meshrcnn.utils.metrics import compare_meshes, compare_meshes_p2m
 
 import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
@@ -135,13 +135,14 @@ def evaluate_test_p2m(model, data_loader):
     num_instances = {i: 0 for i in class_names}
     chamfer = {i: 0 for i in class_names}
     normal = {i: 0 for i in class_names}
-    f1_1e_4 = {i: 0 for i in class_names}
-    f1_2e_4 = {i: 0 for i in class_names}
+    sum_f_scores = {i: np.zeros(4) for i in class_names}
+    object_f_scores = {}
 
     num_batch_evaluated = 0
-    for batch in data_loader:
+    for batch_idx, batch in enumerate(tqdm.tqdm(data_loader)):
         batch = data_loader.postprocess(batch, device)
         sids = [id_str.split("-")[0] for id_str in batch["id_strs"]]
+        id_strs = [id_str for id_str in batch["id_strs"]]
         for sid in sids:
             num_instances[sid] += 1
 
@@ -157,31 +158,36 @@ def evaluate_test_p2m(model, data_loader):
             model_outputs = model(batch["imgs"], **model_kwargs)
             voxel_scores = model_outputs["voxel_scores"]
             meshes_pred = model_outputs["meshes_pred"]
+            # meshes_pred = model_outputs["init_meshes"]
 
-            # NOTE that for the F1 thresholds we take the square root of 1e-4 & 2e-4
-            # as `compare_meshes` returns the euclidean distance (L2) of two pointclouds.
-            # In Pixel2Mesh, the squared L2 (L2^2) is computed instead.
-            # i.e. (L2^2 < τ) <=> (L2 < sqrt(τ))
-            cur_metrics = compare_meshes(
-                meshes_pred[-1], batch["meshes"], scale=0.57, thresholds=[0.01, 0.014142], reduce=False
+            # NOTE that for the F1 thresholds we take 1e-4 & 2e-4 in m^2 units
+            # Following Pixel2Mesh, the squared L2 (L2^2) is computed
+            cur_metrics = compare_meshes_p2m(
+                meshes_pred[-1], batch["meshes"]
             )
-            cur_metrics["verts_per_mesh"] = meshes_pred[-1].num_verts_per_mesh().cpu()
-            cur_metrics["faces_per_mesh"] = meshes_pred[-1].num_faces_per_mesh().cpu()
 
             for i, sid in enumerate(sids):
-                chamfer[sid] += cur_metrics["Chamfer-L2"][i].item()
-                normal[sid] += cur_metrics["AbsNormalConsistency"][i].item()
-                f1_1e_4[sid] += cur_metrics["F1@%f" % 0.01][i].item()
-                f1_2e_4[sid] += cur_metrics["F1@%f" % 0.014142][i].item()
+                # chamfer[sid] += cur_metrics["Chamfer-L2"][i].item()
+                # normal[sid] += cur_metrics["AbsNormalConsistency"][i].item()
+                sum_f_scores[sid] += cur_metrics["f_scores"]
+                object_f_scores[id_strs[i]] = cur_metrics["f_scores"]
 
             num_batch_evaluated += 1
-            logger.info("Evaluated %d / %d batches" % (num_batch_evaluated, len(data_loader)))
 
-    vis_utils.print_instances_class_histogram_p2m(
-        num_instances,
-        class_names,
-        {"chamfer": chamfer, "normal": normal, "f1_1e_4": f1_1e_4, "f1_2e_4": f1_2e_4},
-    )
+    logger.info("f_scores: %r" % sum_f_scores)
+
+    means = []
+    for sid in num_instances.keys():
+        score = sum_f_scores[sid] / num_instances[sid]
+        means.append(score)
+        logger.info("%r %r %r %r" % (
+            sid, class_names[sid], num_instances[sid], ' '.join(map(str, score))
+        ))
+    logger.info("%r %r %r %r" % (
+        'mean', 'all_data', 'total_number', np.mean(means, axis=0)
+    ))
+
+    return {"sum_f_scores": sum_f_scores, "object_f_scores": object_f_scores}
 
 
 @torch.no_grad()
