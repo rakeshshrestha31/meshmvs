@@ -52,8 +52,8 @@ def compare_points_p2m(
 
     f_scores = []
     for t in thresholds:
-        precision = 100.0 * (pred_to_gt_dists2 < t).float().mean(dim=1)
-        recall = 100.0 * (gt_to_pred_dists2 < t).float().mean(dim=1)
+        precision = 100.0 * (pred_to_gt_dists2 <= t).float().mean(dim=1)
+        recall = 100.0 * (gt_to_pred_dists2 <= t).float().mean(dim=1)
         f1 = (2.0 * precision * recall) / (precision + recall + 1e-6)
         f_scores.append(f1.item())
 

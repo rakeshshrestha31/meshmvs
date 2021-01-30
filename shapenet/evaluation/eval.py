@@ -152,40 +152,40 @@ def evaluate_test_p2m(model, data_loader):
         for sid in sids:
             num_instances[sid] += 1
 
-        with inference_context(model):
-            model_kwargs = {}
-            module = model.module if hasattr(model, "module") else model
-            if isinstance(module, VoxMeshMultiViewHead):
-                model_kwargs["intrinsics"] = batch["intrinsics"]
-                model_kwargs["extrinsics"] = batch["extrinsics"]
-            if isinstance(module, VoxMeshDepthHead):
-                model_kwargs["masks"] = batch["masks"]
+        model_kwargs = {}
+        module = model.module if hasattr(model, "module") else model
+        if isinstance(module, VoxMeshMultiViewHead):
+            model_kwargs["intrinsics"] = batch["intrinsics"]
+            model_kwargs["extrinsics"] = batch["extrinsics"]
+        if isinstance(module, VoxMeshDepthHead):
+            model_kwargs["masks"] = batch["masks"]
 
-            model_outputs = model(batch["imgs"], **model_kwargs)
-            meshes_pred = model_outputs["meshes_pred"]
-            # meshes_pred = model_outputs["init_meshes"]
+        model_outputs = model(batch["imgs"], **model_kwargs)
+        meshes_pred = model_outputs["meshes_pred"]
+        # meshes_pred = model_outputs["init_meshes"]
 
-            # NOTE that for the F1 thresholds we take 1e-4 & 2e-4 in m^2 units
-            # Following Pixel2Mesh, the squared L2 (L2^2) is computed
-            cur_mesh_metrics = compare_meshes_p2m(
-                meshes_pred[-1], batch["meshes"]
+        # NOTE that for the F1 thresholds we take 1e-4 & 2e-4 in m^2 units
+        # Following Pixel2Mesh, the squared L2 (L2^2) is computed
+        cur_mesh_metrics = compare_meshes_p2m(
+            meshes_pred[-1], batch["meshes"]
+        )
+
+        cur_vox_metrics = None
+        if "merged_voxel_scores" in model_outputs:
+            cur_vox_metrics = compare_voxel_scores(
+                model_outputs["merged_voxel_scores"],
+                # view 0 is the view of the merged voxel scores
+                batch["voxels"][:, 0],
+                module.cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH
             )
 
-            cur_vox_metrics = None
-            if "merged_voxel_scores" in model_outputs:
-                cur_vox_metrics = compare_voxel_scores(
-                    model_outputs["merged_voxel_scores"],
-                    # view 0 is the view of the merged voxel scores
-                    batch["voxels"][:, 0],
-                    module.cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH
-                )
+        for i, sid in enumerate(sids):
+            # chamfer[sid] += cur_mesh_metrics["Chamfer-L2"][i].item()
+            # normal[sid] += cur_mesh_metrics["AbsNormalConsistency"][i].item()
+            mesh_sum_f_scores[sid] += cur_mesh_metrics["f_scores"]
+            mesh_object_f_scores[id_strs[i]] = cur_mesh_metrics["f_scores"]
 
-            for i, sid in enumerate(sids):
-                # chamfer[sid] += cur_mesh_metrics["Chamfer-L2"][i].item()
-                # normal[sid] += cur_mesh_metrics["AbsNormalConsistency"][i].item()
-                mesh_sum_f_scores[sid] += cur_mesh_metrics["f_scores"]
-                mesh_object_f_scores[id_strs[i]] = cur_mesh_metrics["f_scores"]
-
+            if cur_vox_metrics is not None:
                 vox_sum_f_scores[sid] += cur_vox_metrics["f_scores"][i]
                 vox_object_f_scores[id_strs[i]] = cur_vox_metrics["f_scores"][i]
 
