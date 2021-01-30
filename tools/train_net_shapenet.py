@@ -115,6 +115,7 @@ def main_worker_eval(worker_id, args):
     logger.info(str_out)
 
     if args.eval_vox:
+        logger.info("running eval_vox")
         prediction_dir = os.path.join(
             cfg.OUTPUT_DIR, "predictions"
         )
@@ -125,22 +126,18 @@ def main_worker_eval(worker_id, args):
             str_out += "%s %.4f " % (k, v)
         logger.info(str_out)
     elif args.eval_p2m:
+        logger.info("running eval_p2m")
         test_metrics = evaluate_test_p2m(model, test_loader)
 
-        file_path = os.path.join(cfg.OUTPUT_DIR, "object_f_scores.json")
-        with open(file_path, "w") as f:
-            json.dump({
-                key: value.tolist()
-                for key, value in test_metrics["object_f_scores"].items()
-            }, f, indent=4)
-
-        file_path = os.path.join(cfg.OUTPUT_DIR, "sum_f_scores.json")
-        with open(file_path, "w") as f:
-            json.dump({
-                key: value.tolist()
-                for key, value in test_metrics["sum_f_scores"].items()
-            }, f, indent=4)
+        for metric_name, metric_value in test_metrics.items():
+            file_path = os.path.join(cfg.OUTPUT_DIR, "%s.json" % metric_name)
+            with open(file_path, "w") as f:
+                json.dump({
+                    key: value.tolist()
+                    for key, value in metric_value.items()
+                }, f, indent=4)
     else:
+        logger.info("saving predictions")
         prediction_dir = os.path.join(
             cfg.OUTPUT_DIR, "predictions", "eval", "predict"
         )

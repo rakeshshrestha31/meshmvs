@@ -10,7 +10,8 @@ import torch
 from detectron2.evaluation import inference_context
 from pytorch3d.ops import sample_points_from_meshes
 
-from meshrcnn.utils.metrics import compare_meshes, compare_meshes_p2m
+from meshrcnn.utils.metrics import \
+    compare_meshes, compare_meshes_p2m, compare_voxel_scores
 
 import shapenet.utils.vis as vis_utils
 from shapenet.data.utils import image_to_numpy, imagenet_deprocess
@@ -135,10 +136,15 @@ def evaluate_test_p2m(model, data_loader):
     num_instances = {i: 0 for i in class_names}
     chamfer = {i: 0 for i in class_names}
     normal = {i: 0 for i in class_names}
-    sum_f_scores = {i: np.zeros(4) for i in class_names}
-    object_f_scores = {}
+    mesh_sum_f_scores = {i: np.zeros(4) for i in class_names}
+    mesh_object_f_scores = {}
+    vox_sum_f_scores = {i: np.zeros(1) for i in class_names}
+    vox_object_f_scores = {}
+    vox_sum_precisions = {i: np.zeros(1) for i in class_names}
+    vox_object_precisions = {}
+    vox_sum_recalls = {i: np.zeros(1) for i in class_names}
+    vox_object_recalls = {}
 
-    num_batch_evaluated = 0
     for batch_idx, batch in enumerate(tqdm.tqdm(data_loader)):
         batch = data_loader.postprocess(batch, device)
         sids = [id_str.split("-")[0] for id_str in batch["id_strs"]]
@@ -156,38 +162,85 @@ def evaluate_test_p2m(model, data_loader):
                 model_kwargs["masks"] = batch["masks"]
 
             model_outputs = model(batch["imgs"], **model_kwargs)
-            voxel_scores = model_outputs["voxel_scores"]
             meshes_pred = model_outputs["meshes_pred"]
             # meshes_pred = model_outputs["init_meshes"]
 
             # NOTE that for the F1 thresholds we take 1e-4 & 2e-4 in m^2 units
             # Following Pixel2Mesh, the squared L2 (L2^2) is computed
-            cur_metrics = compare_meshes_p2m(
+            cur_mesh_metrics = compare_meshes_p2m(
                 meshes_pred[-1], batch["meshes"]
             )
 
+            cur_vox_metrics = None
+            if "merged_voxel_scores" in model_outputs:
+                cur_vox_metrics = compare_voxel_scores(
+                    model_outputs["merged_voxel_scores"],
+                    # view 0 is the view of the merged voxel scores
+                    batch["voxels"][:, 0],
+                    module.cfg.MODEL.VOXEL_HEAD.CUBIFY_THRESH
+                )
+
             for i, sid in enumerate(sids):
-                # chamfer[sid] += cur_metrics["Chamfer-L2"][i].item()
-                # normal[sid] += cur_metrics["AbsNormalConsistency"][i].item()
-                sum_f_scores[sid] += cur_metrics["f_scores"]
-                object_f_scores[id_strs[i]] = cur_metrics["f_scores"]
+                # chamfer[sid] += cur_mesh_metrics["Chamfer-L2"][i].item()
+                # normal[sid] += cur_mesh_metrics["AbsNormalConsistency"][i].item()
+                mesh_sum_f_scores[sid] += cur_mesh_metrics["f_scores"]
+                mesh_object_f_scores[id_strs[i]] = cur_mesh_metrics["f_scores"]
 
-            num_batch_evaluated += 1
+                vox_sum_f_scores[sid] += cur_vox_metrics["f_scores"][i]
+                vox_object_f_scores[id_strs[i]] = cur_vox_metrics["f_scores"][i]
 
-    logger.info("f_scores: %r" % sum_f_scores)
+                vox_sum_precisions[sid] += cur_vox_metrics["precisions"][i]
+                vox_object_precisions[id_strs[i]] = cur_vox_metrics["precisions"][i]
 
-    means = []
+                vox_sum_recalls[sid] += cur_vox_metrics["recalls"][i]
+                vox_object_recalls[id_strs[i]] = cur_vox_metrics["recalls"][i]
+
+    logger.info("mesh f_scores")
+    mesh_mean_f_scores = show_instance_stats(
+        mesh_sum_f_scores, num_instances, class_names
+    )
+
+    logger.info("vox f_scores")
+    vox_mean_f_scores = show_instance_stats(
+        vox_sum_f_scores, num_instances, class_names
+    )
+
+    logger.info("vox precisions")
+    vox_mean_precisions = show_instance_stats(
+        vox_sum_precisions, num_instances, class_names
+    )
+
+    logger.info("vox recall")
+    vox_mean_recalls = show_instance_stats(
+        vox_sum_recalls, num_instances, class_names
+    )
+
+    return {
+        "mesh_f_scores":    mesh_mean_f_scores,
+        "vox_f_scores":     vox_mean_f_scores,
+        "vox_precisions":   vox_mean_precisions,
+        "vox_recalls":       vox_mean_recalls,
+        "mesh_object_f_scores":     mesh_object_f_scores,
+        "vox_object_f_scores":     vox_object_f_scores,
+        "vox_object_precisions":     vox_object_precisions,
+        "vox_object_recalls":     vox_object_recalls,
+    }
+
+
+def show_instance_stats(scores, num_instances, class_names):
+    total = []
+    mean_scores = {}
     for sid in num_instances.keys():
-        score = sum_f_scores[sid] / num_instances[sid]
-        means.append(score)
+        mean_scores[sid] = scores[sid] / num_instances[sid]
+        total.append(mean_scores[sid])
         logger.info("%r %r %r %r" % (
-            sid, class_names[sid], num_instances[sid], ' '.join(map(str, score))
+            sid, class_names[sid], num_instances[sid],
+            ' '.join(map(str, mean_scores[sid]))
         ))
     logger.info("%r %r %r %r" % (
-        'mean', 'all_data', 'total_number', np.mean(means, axis=0)
+        'mean', 'all_data', 'total_number', np.mean(total, axis=0)
     ))
-
-    return {"sum_f_scores": sum_f_scores, "object_f_scores": object_f_scores}
+    return mean_scores
 
 
 @torch.no_grad()

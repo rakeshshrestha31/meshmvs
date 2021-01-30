@@ -28,6 +28,7 @@ def compare_meshes_p2m(
 
     return compare_points_p2m(pred_points, gt_points)
 
+# TODO: handle batch size > 1
 @torch.no_grad()
 def compare_points_p2m(
     pred_points, gt_points, thresholds=[0.00005, 0.00010, 0.00015, 0.00020]
@@ -53,11 +54,41 @@ def compare_points_p2m(
     for t in thresholds:
         precision = 100.0 * (pred_to_gt_dists2 < t).float().mean(dim=1)
         recall = 100.0 * (gt_to_pred_dists2 < t).float().mean(dim=1)
-        f1 = (2.0 * precision * recall) / (precision + recall + 1e-8)
+        f1 = (2.0 * precision * recall) / (precision + recall + 1e-6)
         f_scores.append(f1.item())
 
     return {"f_scores": np.asarray(f_scores)}
 
+
+@torch.no_grad()
+def compare_voxel_scores(pred_vox_scores, gt_vox_binary, prob_threshold):
+    """
+    the scores are in logits
+    """
+    def vox_scores_to_binary(vox_scores):
+        nonlocal prob_threshold
+        vox_probs = vox_scores.sigmoid()
+        return vox_probs > prob_threshold
+
+    pred_vox_binary = vox_scores_to_binary(pred_vox_scores)
+    return compare_voxel_binaries(pred_vox_binary, gt_vox_binary.bool())
+
+
+@torch.no_grad()
+def compare_voxel_binaries(pred_vox_binary, gt_vox_binary):
+    # batchwise counts
+    tp = torch.sum((pred_vox_binary == 1) & (gt_vox_binary == 1), [1, 2, 3]).float()
+    tn = torch.sum((pred_vox_binary == 0) & (gt_vox_binary == 0), [1, 2, 3]).float()
+    fp = torch.sum((pred_vox_binary == 1) & (gt_vox_binary == 0), [1, 2, 3]).float()
+    fn = torch.sum((pred_vox_binary == 0) & (gt_vox_binary == 1), [1, 2, 3]).float()
+    precisions = tp / (tp + fp + 1e-6)
+    recalls = tp / (tp + fn + 1e-6)
+    f_scores = 2 * precisions * recalls / (precisions + recalls + 1e-6)
+    return {
+        "precisions": precisions.detach().cpu().numpy(),
+        "recalls": recalls.detach().cpu().numpy(),
+        "f_scores": f_scores.detach().cpu().numpy()
+    }
 
 @torch.no_grad()
 def compare_meshes(
