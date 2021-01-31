@@ -4,6 +4,8 @@ import numpy as np
 from collections import defaultdict
 import tqdm
 import os
+import copy
+import itertools
 
 import detectron2.utils.comm as comm
 import torch
@@ -136,14 +138,28 @@ def evaluate_test_p2m(model, data_loader):
     num_instances = {i: 0 for i in class_names}
     chamfer = {i: 0 for i in class_names}
     normal = {i: 0 for i in class_names}
-    mesh_sum_f_scores = {i: np.zeros(4) for i in class_names}
-    mesh_object_f_scores = {}
-    vox_sum_f_scores = {i: np.zeros(1) for i in class_names}
-    vox_object_f_scores = {}
-    vox_sum_precisions = {i: np.zeros(1) for i in class_names}
-    vox_object_precisions = {}
-    vox_sum_recalls = {i: np.zeros(1) for i in class_names}
-    vox_object_recalls = {}
+
+    # contains classwise sum stats and individual object stats
+    score_dict = {
+        "sum": {i: np.zeros(4) for i in class_names}, "object": {},
+    }
+    score_dicts = {
+        "precisions": copy.deepcopy(score_dict),
+        "recalls": copy.deepcopy(score_dict),
+        "f_scores": copy.deepcopy(score_dict),
+    }
+    scores = {
+        "mesh": copy.deepcopy(score_dicts),
+        "vox": copy.deepcopy(score_dicts),
+    }
+
+    def update_scores(overall_scores, batch_scores, sid_idx, sid, id_str):
+        for metric in ["precisions", "recalls", "f_scores"]:
+            overall_scores[metric]["sum"][sid] \
+                += batch_scores[metric][sid_idx]
+
+            overall_scores[metric]["object"][id_str] \
+                = batch_scores[metric][sid_idx]
 
     for batch_idx, batch in enumerate(tqdm.tqdm(data_loader)):
         batch = data_loader.postprocess(batch, device)
@@ -182,49 +198,20 @@ def evaluate_test_p2m(model, data_loader):
         for i, sid in enumerate(sids):
             # chamfer[sid] += cur_mesh_metrics["Chamfer-L2"][i].item()
             # normal[sid] += cur_mesh_metrics["AbsNormalConsistency"][i].item()
-            mesh_sum_f_scores[sid] += cur_mesh_metrics["f_scores"]
-            mesh_object_f_scores[id_strs[i]] = cur_mesh_metrics["f_scores"]
 
+            update_scores(scores["mesh"], cur_mesh_metrics, i, sid, id_strs[i])
             if cur_vox_metrics is not None:
-                vox_sum_f_scores[sid] += cur_vox_metrics["f_scores"][i]
-                vox_object_f_scores[id_strs[i]] = cur_vox_metrics["f_scores"][i]
+                update_scores(scores["vox"], cur_vox_metrics, i, sid, id_strs[i])
 
-                vox_sum_precisions[sid] += cur_vox_metrics["precisions"][i]
-                vox_object_precisions[id_strs[i]] = cur_vox_metrics["precisions"][i]
+    for model_type, score_type in itertools.product(
+        ["mesh", "vox"], ["precisions", "recalls", "f_scores"]
+    ):
+        logger.info("%s %s" % (model_type, score_type))
+        scores[model_type][score_type]["mean"] = show_instance_stats(
+            scores[model_type][score_type]["sum"], num_instances, class_names
+        )
 
-                vox_sum_recalls[sid] += cur_vox_metrics["recalls"][i]
-                vox_object_recalls[id_strs[i]] = cur_vox_metrics["recalls"][i]
-
-    logger.info("mesh f_scores")
-    mesh_mean_f_scores = show_instance_stats(
-        mesh_sum_f_scores, num_instances, class_names
-    )
-
-    logger.info("vox f_scores")
-    vox_mean_f_scores = show_instance_stats(
-        vox_sum_f_scores, num_instances, class_names
-    )
-
-    logger.info("vox precisions")
-    vox_mean_precisions = show_instance_stats(
-        vox_sum_precisions, num_instances, class_names
-    )
-
-    logger.info("vox recall")
-    vox_mean_recalls = show_instance_stats(
-        vox_sum_recalls, num_instances, class_names
-    )
-
-    return {
-        "mesh_f_scores":    mesh_mean_f_scores,
-        "vox_f_scores":     vox_mean_f_scores,
-        "vox_precisions":   vox_mean_precisions,
-        "vox_recalls":       vox_mean_recalls,
-        "mesh_object_f_scores":     mesh_object_f_scores,
-        "vox_object_f_scores":     vox_object_f_scores,
-        "vox_object_precisions":     vox_object_precisions,
-        "vox_object_recalls":     vox_object_recalls,
-    }
+    return scores
 
 
 def show_instance_stats(scores, num_instances, class_names):

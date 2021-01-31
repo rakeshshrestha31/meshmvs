@@ -50,14 +50,24 @@ def compare_points_p2m(
     # Compute L1 and L2 dists between each GT point and its nearest pred point
     gt_to_pred_dists2 = knn_gt.dists[..., 0]  # (N, S)
 
+    precisions  = []
+    recalls  = []
     f_scores = []
     for t in thresholds:
         precision = 100.0 * (pred_to_gt_dists2 <= t).float().mean(dim=1)
         recall = 100.0 * (gt_to_pred_dists2 <= t).float().mean(dim=1)
         f1 = (2.0 * precision * recall) / (precision + recall + 1e-6)
+
+        precisions.append(precision.item())
+        recalls.append(recall.item())
         f_scores.append(f1.item())
 
-    return {"f_scores": np.asarray(f_scores)}
+    # TODO: Handle batch_size, here dims expanded to fake batch size 1
+    return {
+        "precisions": np.expand_dims(np.asarray(precisions), 0),
+        "recalls": np.expand_dims(np.asarray(recalls), 0),
+        "f_scores": np.expand_dims(np.asarray(f_scores), 0),
+    }
 
 
 @torch.no_grad()

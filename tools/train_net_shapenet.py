@@ -129,13 +129,23 @@ def main_worker_eval(worker_id, args):
         logger.info("running eval_p2m")
         test_metrics = evaluate_test_p2m(model, test_loader)
 
-        for metric_name, metric_value in test_metrics.items():
-            file_path = os.path.join(cfg.OUTPUT_DIR, "%s.json" % metric_name)
-            with open(file_path, "w") as f:
-                json.dump({
-                    key: value.tolist()
-                    for key, value in metric_value.items()
-                }, f, indent=4)
+        # model_type -> mesh, vox
+        for model_type in test_metrics.keys():
+            # model_type -> precisions, recalls, f_scores
+            for metric_type in test_metrics[model_type].keys():
+                # model_type -> sum, mean, object
+                for metric_subtype in test_metrics[model_type][metric_type].keys():
+                    file_path = os.path.join(
+                        cfg.OUTPUT_DIR,
+                        "%s_%s_%s.json" % (model_type, metric_type, metric_subtype)
+                    )
+                    metric = test_metrics[model_type][metric_type][metric_subtype]
+                    with open(file_path, "w") as f:
+                        json.dump({
+                            key: value.tolist()
+                            for key, value in metric.items()
+                        }, f, indent=4)
+
     else:
         logger.info("saving predictions")
         prediction_dir = os.path.join(
