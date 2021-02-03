@@ -152,7 +152,7 @@ class MeshLoss(nn.Module):
 
         if voxel_scores is not None:
             voxel_labels = torch.cat((voxel_labels, voxels_gt), dim=1)
-            voxel_predicted = [voxel_predicted, *voxel_scores]
+            voxel_predicted = [*voxel_predicted, *voxel_scores]
 
         for voxel_idx, voxel_score in enumerate(voxel_predicted):
             voxel_loss = F.binary_cross_entropy_with_logits(
