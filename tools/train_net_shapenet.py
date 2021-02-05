@@ -88,7 +88,14 @@ def main_worker_eval(worker_id, args):
         raise ValueError("Invalid checkpoing provided")
     logger.info("Loading model from checkpoint: %s" % (cfg.MODEL.CHECKPOINT))
     cp = torch.load(PathManager.get_local_path(cfg.MODEL.CHECKPOINT))
-    state_dict = clean_state_dict(cp["best_states"]["model"])
+
+    if args.eval_latest_checkpoint:
+        logger.info("using latest checkpoint weights")
+        state_dict = clean_state_dict(cp["latest_states"]["model"])
+    else:
+        logger.info("using best checkpoint weights")
+        state_dict = clean_state_dict(cp["best_states"]["model"])
+
     model = build_model(cfg)
     model.load_state_dict(state_dict)
     logger.info("Model loaded")
@@ -151,7 +158,14 @@ def main_worker_eval(worker_id, args):
         prediction_dir = os.path.join(
             cfg.OUTPUT_DIR, "predictions", "eval", "predict"
         )
-        save_predictions(model, test_loader, prediction_dir)
+        if (not args.eval_save_point_clouds) and (not args.eval_save_meshes):
+            logger.info("both save-point-clouds and save-meshes false")
+            args.eval_save_point_clouds = True
+
+        save_predictions(
+            model, test_loader, prediction_dir,
+            args.eval_save_point_clouds, args.eval_save_meshes
+        )
     # else:
     #     evaluate_test(model, test_loader)
 
@@ -476,7 +490,7 @@ def eval_and_save(
 
 
 @torch.no_grad()
-def save_predictions(model, loader, output_dir):
+def save_predictions(model, loader, output_dir, save_point_clouds, save_meshes):
     """
     This function is used save predicted and gt meshes
     """
@@ -536,27 +550,30 @@ def save_predictions(model, loader, output_dir):
         #     )
 
         # only the last stage
-        gcn_stages = [len(model_outputs["meshes_pred"])-1]
+        # gcn_stages = [len(model_outputs["meshes_pred"])-1]
         # all stages
-        # gcn_stages = range(len(model_outputs["meshes_pred"]))
+        gcn_stages = range(len(model_outputs["meshes_pred"]))
         for gcn_stage in gcn_stages:
             pred_mesh = model_outputs["meshes_pred"][gcn_stage]
             file_prefix = str(gcn_stage)
             save_p2m_format(
-                batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix
+                batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix,
+                save_point_clouds, save_meshes
             )
 
 def save_p2m_format(
-        batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix
+        batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix,
+        save_point_clouds, save_meshes
 ):
     pred_mesh = pred_mesh.scale_verts(P2M_SCALE)
 
-    pred_points = sample_points_from_meshes(
-        pred_mesh, NUM_PRED_SURFACE_SAMPLES, return_normals=False
-    )
-    pred_points = pred_points.cpu().detach().numpy()
+    if save_point_clouds:
+        pred_points = sample_points_from_meshes(
+            pred_mesh, NUM_PRED_SURFACE_SAMPLES, return_normals=False
+        )
+        pred_points = pred_points.cpu().detach().numpy()
 
-    batch_size = pred_points.shape[0]
+    batch_size = gt_points.shape[0]
     for batch_idx in range(batch_size):
         label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
         os.makedirs(os.path.join(output_dir, file_prefix), exist_ok=True)
@@ -565,30 +582,33 @@ def save_p2m_format(
             os.path.join(output_dir, file_prefix),
             "{}_{}_predict.xyz".format(label, label_appendix)
         )
-        np.savetxt(pred_filename, pred_points[batch_idx])
 
         gt_filename = os.path.join(
             os.path.join(output_dir, file_prefix),
             "{}_{}_ground.xyz".format(label, label_appendix)
         )
-        np.savetxt(gt_filename, gt_points[batch_idx])
 
-        # pred_filename = pred_filename.replace(".xyz", ".obj")
-        # gt_filename = gt_filename.replace(".xyz", ".obj")
+        if save_point_clouds:
+            np.savetxt(pred_filename, pred_points[batch_idx])
+            np.savetxt(gt_filename, gt_points[batch_idx])
 
-        # pred_verts, pred_faces = pred_mesh[batch_idx] \
-        #                             .get_mesh_verts_faces(0)
-        # gt_verts, gt_faces = gt_mesh[batch_idx] \
-        #                         .get_mesh_verts_faces(0)
-        # save_obj(pred_filename, pred_verts, pred_faces)
-        # save_obj(gt_filename, gt_verts, gt_faces)
+        if save_meshes:
+            pred_filename = pred_filename.replace(".xyz", ".obj")
+            gt_filename = gt_filename.replace(".xyz", ".obj")
 
-        # metrics = compare_meshes(
-        #     pred_mesh[batch_idx], gt_mesh[batch_idx],
-        #     num_samples=NUM_GT_SURFACE_SAMPLES, scale=1.0,
-        #     thresholds=[0.01, 0.014142], reduce=True
-        # )
-        # print("%s_%s: %r" % (label, label_appendix, metrics))
+            pred_verts, pred_faces = pred_mesh[batch_idx] \
+                                        .get_mesh_verts_faces(0)
+            gt_verts, gt_faces = gt_mesh[batch_idx] \
+                                    .get_mesh_verts_faces(0)
+            save_obj(pred_filename, pred_verts, pred_faces)
+            # save_obj(gt_filename, gt_verts, gt_faces)
+
+            # metrics = compare_meshes(
+            #     pred_mesh[batch_idx], gt_mesh[batch_idx],
+            #     num_samples=NUM_GT_SURFACE_SAMPLES, scale=1.0,
+            #     thresholds=[0.01, 0.014142], reduce=True
+            # )
+            # print("%s_%s: %r" % (label, label_appendix, metrics))
 
 
 @torch.no_grad()
