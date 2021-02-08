@@ -204,7 +204,7 @@ def evaluate_test_p2m(model, data_loader):
                 update_scores(scores["vox"], cur_vox_metrics, i, sid, id_strs[i])
 
     for model_type, score_type in itertools.product(
-        ["mesh", "vox"], ["precisions", "recalls", "f_scores"]
+        ["vox", "mesh"], ["precisions", "recalls", "f_scores"]
     ):
         logger.info("%s %s" % (model_type, score_type))
         scores[model_type][score_type]["mean"] = show_instance_stats(
