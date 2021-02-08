@@ -1,0 +1,22 @@
+\begin{table}[ht]
+% \captionsetup{font=footnotesize,labelfont=footnotesize}
+\begin{center}
+\footnotesize
+\begin{tabular}{ l c c }
+\toprule[1pt]
+ &F1-$\tau$ &F1-2$\tau$ \\ \hline
+(1) Input Concatenation \qquad \qquad  \qquad  \qquad  \qquad  & \textbf{80.80} & \textbf{90.72} \\
+(2) Input Difference & 80.41 & 90.54 \\
+(3) Feature Concatenation   & 80.45 & 90.54 \\
+(4) Feature Difference & 80.30 & 90.40 \\
+(5) Predicted Depth only & 79.40 & 89.95 \\
+(6) Rendered Depth only & 78.20 & 88.90 \\
+\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\vspace{-4mm}
+\caption{\textbf{Comparisons of different contrastive depth formulations}. In 1st and 2nd rows, concatenation and difference of the rendered and predicted depths are fed to VGG feature extractor while in 3rd and 4th rows, concatenation and difference of the VGG features from the depths is used for mesh refinement. 5 uses VGG features from predicted depths only while 6 uses VGG features from rendered depths only.}
+\label{table:contrastive_feature_extraction}
+\end{table}
+
+

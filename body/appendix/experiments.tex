@@ -1,0 +1,38 @@
+\section*{Experiments}
+
+We quantitatively compare our method against previous works for multi-view shape generation in~\tableref{baseline_comparison_cd} and show effectiveness of our proposed shape generation methods in improving shape quality. Our method outperforms the state-of-the-art method  Pixel2Mesh++~\cite{wen2019pixel2mesh++} with
+decrease in chamfer distance to ground truth by 34\%, which shows the effectiveness of our proposed method.
+Note that in~\tableref{baseline_comparison_cd} same model is trained for all the categories but accuracy on individual categories as well as average over all the categories are evaluated.
+
+\input{tables/baseline_comparison_chamfer_distance.tex}
+
+\subsection*{Ablation studies}
+
+\vspace{-2mm}
+\paragraph{Coarse Shape Generation}
+We conduct comparisons on voxel grid predicted from our proposed probabilistically merged voxel grids against single view method~\cite{gkioxari2019meshrcnn}.
+As is shown in~\tableref{multiview_voxel_accuracy}, the accuracy of the initial shape generated from probabilistically merged voxel grid is higher than that from individual views.
+% \tableref{multiview_voxel_accuracy} also evaluates different input modalities for voxel prediction among which RGB image concataneted with depth image produces best results.
+% Note that the \emph{voxel branch} (~\subsecref{multiview_voxel}) was trained and tested separately for each of the cases without mesh refinement.
+
+\input{tables/multiview_voxel_accuracy.tex}
+\vspace{-2mm}
+\paragraph{Accuracy at Different GCN Stages}
+We analyze the accuracy of meshes at different GCN stages in~\tableref{gcn_stages}. The results validate that our method produces the meshes in a coarse-to-fine manner and multiple GCN refinements improve the mesh quality.
+
+\vspace{-2mm}
+\paragraph{Resolution of Depth Prediction}
+We conduct experiments using different numbers of depth hypotheses in our depth prediction network (\subsecref{mvsnet}), producing depth values at different resolutions.
+A higher number of depth hypothesis means finer resolution of the predicted depths.
+The quantitative results with different hypothesis numbers are summarized in~\tableref{depth_resolution}. We set depth hypothesis as $48$ for our final architecture which is equivalent to the resolution of $25$ mm.
+We observe that the mesh accuracy remain relatively unchanged if we predict depths at finer resolutions.
+% We evaluate the performance at different number of depth hypothesis of the depth prediction model (\subsecref{depth_prediction} ).
+% As can be seen in~\tableref{depth_resolution}, the performance of the model with different number of depth hypotheses are roughly the same. Note that the range of depth values for all the models are kept the same.
+\input{tables/depth_resolution.tex}
+
+\vspace{-2mm}
+\paragraph{Generalization Capability}
+We conduct experiments to evaluate the generalization capability of our system across the semantic categories. We train our model with only 12 out of the 13 categories and test on the category that was left out. \tableref{train_except_one_category} shows that the accuracy generally does not decrease significantly when compared with the model that was trained on all 13 categories when using $2\tau$ threshold for the F-score.
+\input{tables/generalization.tex}
+% \rakesh{We can also perform similar experiments where only one category is used for training, and we test the generalization to other 12 categories}
+

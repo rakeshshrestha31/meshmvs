@@ -1,0 +1,38 @@
+\begin{table}[ht]
+\begin{center}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{|c|cccccc|cccccc|}
+    \hline
+    \multirow{3}{*}{Category}&
+    \multicolumn{6}{c|}{F-score ($\tau$) $\uparrow$}&
+    \multicolumn{6}{c|}{F-score ($2\tau$) $\uparrow$}\\
+    & \multirow{2}{*}{3D-R2N2}  & \multirow{2}{*}{LSM}  & \multirow{2}{*}{MVP2M}    & \multirow{2}{*}{P2M++} & Ours & \bf{Ours}
+    & \multirow{2}{*}{3D-R2N2}  & \multirow{2}{*}{LSM}  & \multirow{2}{*}{MVP2M}    & \multirow{2}{*}{P2M++} & Ours & \bf{Ours} \\
+    &                           &                       &                           &                        & (pretty) & \bf{(best)} &
+                                &                       &                           &                        & (pretty) & \bf{(best)} \\
+    \hline
+    Couch       & 45.47 & 43.02 & 53.17 & 57.56 & 71.63 & \bf{73.63}    & 59.97 & 55.49 & 73.24 & 75.33 & 85.28 & \bf{88.24} \\
+    Cabinet     & 54.08 & 50.80 & 56.85 & 65.72 & 75.91 & \bf{76.39}    & 64.42 & 60.72 & 76.58 & 81.57 & 87.61 & \bf{88.84} \\
+    Bench       & 44.56 & 49.33 & 60.37 & 66.24 & 81.11 & \bf{83.76}    & 62.47 & 65.92 & 75.69 & 79.67 & 90.56 & \bf{92.57} \\
+    Chair       & 37.62 & 48.55 & 54.19 & 62.05 & 77.63 & \bf{78.69}    & 54.26 & 64.95 & 72.36 & 77.68 & 88.24 & \bf{90.02} \\
+    Monitor     & 36.33 & 43.65 & 53.41 & 60.00 & 74.14 & \bf{76.64}    & 48.65 & 56.33 & 70.63 & 75.42 & 86.04 & \bf{88.89} \\
+    Firearm     & 55.72 & 56.14 & 79.67 & 80.74 & 92.92 & \bf{94.32}    & 76.79 & 73.89 & 89.08 & 89.29 & 96.81 & \bf{97.67} \\
+    Speaker     & 41.48 & 45.21 & 48.90 & 54.88 & 66.02 & \bf{67.83}    & 52.29 & 56.65 & 68.29 & 71.46 & 79.76 & \bf{82.34} \\
+    Lamp        & 32.25 & 45.58 & 50.82 & 62.56 & 72.47 & \bf{75.93}    & 49.38 & 64.76 & 65.72 & 74.00 & 82.00 & \bf{85.33} \\
+    Cellphone   & 58.09 & 60.11 & 66.07 & 74.36 & 85.57 & \bf{86.45}    & 69.66 & 71.39 & 82.31 & 86.16 & 93.40 & \bf{94.28} \\
+    Plane       & 47.81 & 55.60 & 75.16 & 76.79 & 89.23 & \bf{92.13}    & 70.49 & 76.39 & 86.38 & 86.62 & 94.65 & \bf{96.57} \\
+    Table       & 48.78 & 48.61 & 65.95 & 71.89 & 82.37 & \bf{83.68}    & 62.67 & 62.22 & 79.96 & 84.19 & 90.24 & \bf{91.97} \\
+    Car         & 59.86 & 51.91 & 67.27 & 68.45 & 77.01 & \bf{80.43}    & 78.31 & 68.20 & 84.64 & 85.19 & 88.99 & \bf{92.33} \\
+    Watercraft  & 40.72 & 47.96 & 61.85 & 62.99 & 75.52 & \bf{80.48}    & 63.59 & 66.95 & 77.49 & 77.32 & 86.77 & \bf{90.35} \\
+    \hline
+    Mean        & 46.37 & 49.73 & 61.05 & 66.48 & 78.58 & \bf{80.80}    & 62.53 & 64.91 & 77.10 & 80.30 & 88.49 & \bf{90.72} \\
+    \hline
+\end{tabular}}
+\end{center}
+\vspace{-4mm}
+\caption{
+    \textbf{Qualitative comparison} against state-of-the-art multi-view shape generation methods. We report F-score on each semantic category along with the mean over all categories using two thresholds $\tau$ and $2\tau$ for nearest neighbor match where ${\tau}$=$10^{-4}$ m$^2$.
+}
+\label{table:baseline_comparison}
+\end{table}
+

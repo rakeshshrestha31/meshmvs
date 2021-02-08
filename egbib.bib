@@ -1,0 +1,774 @@
+% single view shape generation
+
+@inproceedings{yao2020front2back,
+  title={Front2Back: Single View 3D Shape Reconstruction via Front to Back Prediction},
+  author={Yao, Yuan and Schertler, Nico and Rosales, Enrique and Rhodin, Helge and Sigal, Leonid and Sheffer, Alla},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={531--540},
+  year={2020}
+}
+
+@inproceedings{pan2019deep,
+  title={Deep mesh reconstruction from single RGB images via topology modification networks},
+  author={Pan, Junyi and Han, Xiaoguang and Chen, Weikai and Tang, Jiapeng and Jia, Kui},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={9964--9973},
+  year={2019}
+}
+
+@inproceedings{fan2017point,
+  title={A point set generation network for 3d object reconstruction from a single image},
+  author={Fan, Haoqiang and Su, Hao and Guibas, Leonidas J},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={605--613},
+  year={2017}
+}
+
+@inproceedings{yang2018foldingnet,
+  title={Foldingnet: Point cloud auto-encoder via deep grid deformation},
+  author={Yang, Yaoqing and Feng, Chen and Shen, Yiru and Tian, Dong},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={206--215},
+  year={2018}
+}
+@inproceedings{yan2016perspective,
+  title={Perspective transformer nets: Learning single-view 3d object reconstruction without 3d supervision},
+  author={Yan, Xinchen and Yang, Jimei and Yumer, Ersin and Guo, Yijie and Lee, Honglak},
+  booktitle={Advances in neural information processing systems},
+  pages={1696--1704},
+  year={2016}
+}
+@inproceedings{tulsiani2017multi,
+  title={Multi-view supervision for single-view reconstruction via differentiable ray consistency},
+  author={Tulsiani, Shubham and Zhou, Tinghui and Efros, Alexei A and Malik, Jitendra},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={2626--2634},
+  year={2017}
+}
+
+@inproceedings{wang2018pixel2mesh,
+  title={Pixel2mesh: Generating 3d mesh models from single rgb images},
+  author={Wang, Nanyang and Zhang, Yinda and Li, Zhuwen and Fu, Yanwei and Liu, Wei and Jiang, Yu-Gang},
+  booktitle={Proceedings of the European Conference on Computer Vision (ECCV)},
+  pages={52--67},
+  year={2018}
+}
+
+@inproceedings{gkioxari2019meshrcnn,
+  title={Mesh r-cnn},
+  author={Gkioxari, Georgia and Malik, Jitendra and Johnson, Justin},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={9785--9795},
+  year={2019}
+}
+
+@inproceedings{pan2019deep,
+  title={Deep Mesh Reconstruction from Single RGB Images via Topology Modification Networks},
+  author={Pan, Junyi and Han, Xiaoguang and Chen, Weikai and Tang, Jiapeng and Jia, Kui},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={9964--9973},
+  year={2019}
+}
+
+@misc{wickramasinghe2019voxel2mesh,
+    title={Voxel2Mesh: 3D Mesh Model Generation from Volumetric Data},
+    author={Udaranga Wickramasinghe and Edoardo Remelli and Graham Knott and Pascal Fua},
+    year={2019},
+    eprint={1912.03681},
+    archivePrefix={arXiv},
+    primaryClass={cs.CV}
+}
+
+@misc{jin2019drkfs,
+    title={DR-KFS: A Differentiable Visual Similarity Metric for 3D Shape Reconstruction},
+    author={Jiongchao Jin and Akshay Gadi Patil and Zhang Xiong and Hao Zhang},
+    year={2019},
+    eprint={1911.09204},
+    archivePrefix={arXiv},
+    primaryClass={cs.GR}
+}
+
+@article{huang2015single,
+  title={Single-view reconstruction via joint analysis of image and shape collections},
+  author={Huang, Qixing and Wang, Hai and Koltun, Vladlen},
+  journal={ACM Transactions on Graphics (TOG)},
+  volume={34},
+  number={4},
+  pages={1--10},
+  year={2015},
+  publisher={ACM New York, NY, USA}
+}
+
+@inproceedings{kar2015category,
+  title={Category-specific object reconstruction from a single image},
+  author={Kar, Abhishek and Tulsiani, Shubham and Carreira, Joao and Malik, Jitendra},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={1966--1974},
+  year={2015}
+}
+
+@inproceedings{tang2019skeleton,
+  title={A skeleton-bridged deep learning approach for generating meshes of complex topologies from single rgb images},
+  author={Tang, Jiapeng and Han, Xiaoguang and Pan, Junyi and Jia, Kui and Tong, Xin},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={4541--4550},
+  year={2019}
+}
+
+@article{su2014estimating,
+  title={Estimating image depth using shape collections},
+  author={Su, Hao and Huang, Qixing and Mitra, Niloy J and Li, Yangyan and Guibas, Leonidas},
+  journal={ACM Transactions on Graphics (TOG)},
+  volume={33},
+  number={4},
+  pages={1--11},
+  year={2014},
+  publisher={ACM New York, NY, USA}
+}
+
+@inproceedings{kurenkov2018deformnet,
+  title={Deformnet: Free-form deformation network for 3d shape reconstruction from a single image},
+  author={Kurenkov, Andrey and Ji, Jingwei and Garg, Animesh and Mehta, Viraj and Gwak, JunYoung and Choy, Christopher and Savarese, Silvio},
+  booktitle={2018 IEEE Winter Conference on Applications of Computer Vision (WACV)},
+  pages={858--866},
+  year={2018},
+  organization={IEEE}
+}
+
+@article{nie2020total3dunderstanding,
+  title={Total3DUnderstanding: Joint Layout, Object Pose and Mesh Reconstruction for Indoor Scenes from a Single Image},
+  author={Nie, Yinyu and Han, Xiaoguang and Guo, Shihui and Zheng, Yujian and Chang, Jian and Zhang, Jian Jun},
+  journal={arXiv preprint arXiv:2002.12212},
+  year={2020}
+}
+
+@article{murez2020atlas,
+  title={Atlas: End-to-End 3D Scene Reconstruction from Posed Images},
+  author={Murez, Zak and van As, Tarrence and Bartolozzi, James and Sinha, Ayan and Badrinarayanan, Vijay and Rabinovich, Andrew},
+  journal={arXiv preprint arXiv:2003.10432},
+  year={2020}
+}
+
+@inproceedings{mescheder2019occupancy,
+  title={Occupancy networks: Learning 3d reconstruction in function space},
+  author={Mescheder, Lars and Oechsle, Michael and Niemeyer, Michael and Nowozin, Sebastian and Geiger, Andreas},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={4460--4470},
+  year={2019}
+}
+
+@inproceedings{groueix2018papier,
+  title={A papier-m{\^a}ch{\'e} approach to learning 3d surface generation},
+  author={Groueix, Thibault and Fisher, Matthew and Kim, Vladimir G and Russell, Bryan C and Aubry, Mathieu},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={216--224},
+  year={2018}
+}
+
+@article{han2020seqxy2seqz,
+  title={SeqXY2SeqZ: Structure Learning for 3D Shapes by Sequentially Predicting 1D Occupancy Segments From 2D Coordinates},
+  author={Han, Zhizhong and Qiao, Guanhui and Liu, Yu-Shen and Zwicker, Matthias},
+  journal={arXiv preprint arXiv:2003.05559},
+  year={2020}
+}
+
+@inproceedings{lin2019photometric,
+  title={Photometric mesh optimization for video-aligned 3D object reconstruction},
+  author={Lin, Chen-Hsuan and Wang, Oliver and Russell, Bryan C and Shechtman, Eli and Kim, Vladimir G and Fisher, Matthew and Lucey, Simon},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={969--978},
+  year={2019}
+}
+
+@article{jia2020dv,
+  title={DV-Net: Dual-view network for 3D reconstruction by fusing multiple sets of gated control point clouds},
+  author={Jia, Xin and Yang, Shourui and Peng, Yuxin and Zhang, Junchao and Chen, Shengyong},
+  journal={Pattern Recognition Letters},
+  volume={131},
+  pages={376--382},
+  year={2020},
+  publisher={Elsevier}
+}
+
+@inproceedings{yang2018foldingnet,
+  title={Foldingnet: Point cloud auto-encoder via deep grid deformation},
+  author={Yang, Yaoqing and Feng, Chen and Shen, Yiru and Tian, Dong},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={206--215},
+  year={2018}
+}
+
+@article{liu2019dist,
+  title={DIST: Rendering Deep Implicit Signed Distance Function with Differentiable Sphere Tracing},
+  author={Liu, Shaohui and Zhang, Yinda and Peng, Songyou and Shi, Boxin and Pollefeys, Marc and Cui, Zhaopeng},
+  journal={arXiv preprint arXiv:1911.13225},
+  year={2019}
+}
+
+@inproceedings{liu2019learning,
+  title={Learning to infer implicit surfaces without 3d supervision},
+  author={Liu, Shichen and Saito, Shunsuke and Chen, Weikai and Li, Hao},
+  booktitle={Advances in Neural Information Processing Systems},
+  pages={8293--8304},
+  year={2019}
+}
+
+@inproceedings{park2019deepsdf,
+  title={Deepsdf: Learning continuous signed distance functions for shape representation},
+  author={Park, Jeong Joon and Florence, Peter and Straub, Julian and Newcombe, Richard and Lovegrove, Steven},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={165--174},
+  year={2019}
+}
+
+@article{xiao2020survey,
+  title={A Survey on Deep Geometry Learning: From a Representation Perspective},
+  author={Xiao, Yun-Peng and Lai, Yu-Kun and Zhang, Fang-Lue and Li, Chunpeng and Gao, Lin},
+  journal={arXiv preprint arXiv:2002.07995},
+  year={2020}
+}
+
+# background stuffs
+@article{kazhdan2013screened,
+  title={Screened poisson surface reconstruction},
+  author={Kazhdan, Michael and Hoppe, Hugues},
+  journal={ACM Transactions on Graphics (ToG)},
+  volume={32},
+  number={3},
+  pages={1--13},
+  year={2013},
+  publisher={ACM New York, NY, USA}
+}
+
+@inproceedings{schonberger2016structure,
+  title={Structure-from-motion revisited},
+  author={Schonberger, Johannes L and Frahm, Jan-Michael},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={4104--4113},
+  year={2016}
+}
+
+@article{agarwal2011building,
+  title={Building rome in a day},
+  author={Agarwal, Sameer and Furukawa, Yasutaka and Snavely, Noah and Simon, Ian and Curless, Brian and Seitz, Steven M and Szeliski, Richard},
+  journal={Communications of the ACM},
+  volume={54},
+  number={10},
+  pages={105--112},
+  year={2011},
+  publisher={ACM New York, NY, USA}
+}
+
+@inproceedings{cui2015global,
+  title={Global structure-from-motion by similarity averaging},
+  author={Cui, Zhaopeng and Tan, Ping},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={864--872},
+  year={2015}
+}
+
+@inproceedings{cui2017hsfm,
+  title={HSfM: Hybrid structure-from-motion},
+  author={Cui, Hainan and Gao, Xiang and Shen, Shuhan and Hu, Zhanyi},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={1212--1221},
+  year={2017}
+}
+
+@article{scarselli2008graph,
+  title={The graph neural network model},
+  author={Scarselli, Franco and Gori, Marco and Tsoi, Ah Chung and Hagenbuchner, Markus and Monfardini, Gabriele},
+  journal={IEEE Transactions on Neural Networks},
+  volume={20},
+  number={1},
+  pages={61--80},
+  year={2008},
+  publisher={IEEE}
+}
+
+@article{cadena2016pastslam,
+  title={Past, present, and future of simultaneous localization and mapping: Toward the robust-perception age},
+  author={Cadena, Cesar and Carlone, Luca and Carrillo, Henry and Latif, Yasir and Scaramuzza, Davide and Neira, Jos{\'e} and Reid, Ian and Leonard, John J},
+  journal={IEEE Transactions on robotics},
+  volume={32},
+  number={6},
+  pages={1309--1332},
+  year={2016},
+  publisher={IEEE}
+}
+
+@article{mur2015orb,
+  title={ORB-SLAM: a versatile and accurate monocular SLAM system},
+  author={Mur-Artal, Raul and Montiel, Jose Maria Martinez and Tardos, Juan D},
+  journal={IEEE transactions on robotics},
+  volume={31},
+  number={5},
+  pages={1147--1163},
+  year={2015},
+  publisher={IEEE}
+}
+
+@inproceedings{engel2014lsd,
+  title={LSD-SLAM: Large-scale direct monocular SLAM},
+  author={Engel, Jakob and Sch{\"o}ps, Thomas and Cremers, Daniel},
+  booktitle={European conference on computer vision},
+  pages={834--849},
+  year={2014},
+  organization={Springer}
+}
+
+@inproceedings{whelan2015elasticfusion,
+  title={ElasticFusion: Dense SLAM without a pose graph},
+  author={Whelan, Thomas and Leutenegger, Stefan and Salas-Moreno, R and Glocker, Ben and Davison, Andrew},
+  year={2015},
+  organization={Robotics: Science and Systems}
+}
+
+% multi-view shape generation
+@inproceedings{wen2019pixel2mesh++,
+  title={Pixel2mesh++: Multi-view 3d mesh generation via deformation},
+  author={Wen, Chao and Zhang, Yinda and Li, Zhuwen and Fu, Yanwei},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={1042--1051},
+  year={2019}
+}
+
+@inproceedings{3dr2n2,
+  title={3d-r2n2: A unified approach for single and multi-view 3d object reconstruction},
+  author={Choy, Christopher B and Xu, Danfei and Gwak, JunYoung and Chen, Kevin and Savarese, Silvio},
+  booktitle={European conference on computer vision},
+  pages={628--644},
+  year={2016},
+  organization={Springer}
+}
+
+@inproceedings{mcrecon2017,
+  title={Weakly supervised 3d reconstruction with adversarial constraint},
+  author={Gwak, JunYoung and Choy, Christopher B and Chandraker, Manmohan and Garg, Animesh and Savarese, Silvio},
+  booktitle={2017 International Conference on 3D Vision (3DV)},
+  pages={263--272},
+  year={2017},
+  organization={IEEE}
+}
+
+@inproceedings{yan2016perspective,
+  title={Perspective transformer nets: Learning single-view 3d object reconstruction without 3d supervision},
+  author={Yan, Xinchen and Yang, Jimei and Yumer, Ersin and Guo, Yijie and Lee, Honglak},
+  booktitle={Advances in neural information processing systems},
+  pages={1696--1704},
+  year={2016}
+}
+
+@inproceedings{tulsiani2017multi,
+  title={Multi-view supervision for single-view reconstruction via differentiable ray consistency},
+  author={Tulsiani, Shubham and Zhou, Tinghui and Efros, Alexei A and Malik, Jitendra},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={2626--2634},
+  year={2017}
+}
+
+% Depth prediction
+@inproceedings{campbell2008using,
+  title={Using multiple hypotheses to improve depth-maps for multi-view stereo},
+  author={Campbell, Neill DF and Vogiatzis, George and Hern{\'a}ndez, Carlos and Cipolla, Roberto},
+  booktitle={European Conference on Computer Vision},
+  pages={766--779},
+  year={2008},
+  organization={Springer}
+}
+
+@inproceedings{galliani2015massively,
+  title={Massively parallel multiview stereopsis by surface normal diffusion},
+  author={Galliani, Silvano and Lasinger, Katrin and Schindler, Konrad},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={873--881},
+  year={2015}
+}
+
+@inproceedings{schonberger2016pixelwise,
+  title={Pixelwise view selection for unstructured multi-view stereo},
+  author={Sch{\"o}nberger, Johannes L and Zheng, Enliang and Frahm, Jan-Michael and Pollefeys, Marc},
+  booktitle={European Conference on Computer Vision},
+  pages={501--518},
+  year={2016},
+  organization={Springer}
+}
+
+@inproceedings{deepmvs2018,
+  title={Deepmvs: Learning multi-view stereopsis},
+  author={Huang, Po-Han and Matzen, Kevin and Kopf, Johannes and Ahuja, Narendra and Huang, Jia-Bin},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={2821--2830},
+  year={2018}
+}
+
+@inproceedings{im2019dpsnet,
+  title={DPSNet: End-to-end deep plane sweep stereo},
+  author={Im, Sunghoon and Jeon, Hae-Gon and Lin, Stephen and Kweon, In-So},
+  booktitle={7th International Conference on Learning Representations, ICLR 2019},
+  year={2019},
+  organization={International Conference on Learning Representations, ICLR}
+}
+
+@inproceedings{yao2018mvsnet,
+  title={Mvsnet: Depth inference for unstructured multi-view stereo},
+  author={Yao, Yao and Luo, Zixin and Li, Shiwei and Fang, Tian and Quan, Long},
+  booktitle={Proceedings of the European Conference on Computer Vision (ECCV)},
+  pages={767--783},
+  year={2018}
+}
+
+@inproceedings{zhang2018activestereonet,
+  title={Activestereonet: End-to-end self-supervised learning for active stereo systems},
+  author={Zhang, Yinda and Khamis, Sameh and Rhemann, Christoph and Valentin, Julien and Kowdle, Adarsh and Tankovich, Vladimir and Schoenberg, Michael and Izadi, Shahram and Funkhouser, Thomas and Fanello, Sean},
+  booktitle={Proceedings of the European Conference on Computer Vision (ECCV)},
+  pages={784--801},
+  year={2018}
+}
+
+@inproceedings{yao2019recurrent,
+  title={Recurrent mvsnet for high-resolution multi-view stereo depth inference},
+  author={Yao, Yao and Luo, Zixin and Li, Shiwei and Shen, Tianwei and Fang, Tian and Quan, Long},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={5525--5534},
+  year={2019}
+}
+
+@inproceedings{kar2017lsm,
+  title={Learning a multi-view stereo machine},
+  author={Kar, Abhishek and H{\"a}ne, Christian and Malik, Jitendra},
+  booktitle={Advances in neural information processing systems},
+  pages={365--376},
+  year={2017}
+}
+
+@article{kutulakos2000theory,
+  title={A theory of shape by space carving},
+  author={Kutulakos, Kiriakos N and Seitz, Steven M},
+  journal={International journal of computer vision},
+  volume={38},
+  number={3},
+  pages={199--218},
+  year={2000},
+  publisher={Springer}
+}
+
+@article{seitz1999photorealistic,
+  title={Photorealistic scene reconstruction by voxel coloring},
+  author={Seitz, Steven M and Dyer, Charles R},
+  journal={International Journal of Computer Vision},
+  volume={35},
+  number={2},
+  pages={151--173},
+  year={1999},
+  publisher={Springer}
+}
+
+@article{furukawa2009accurate,
+  title={Accurate, dense, and robust multiview stereopsis},
+  author={Furukawa, Yasutaka and Ponce, Jean},
+  journal={IEEE transactions on pattern analysis and machine intelligence},
+  volume={32},
+  number={8},
+  pages={1362--1376},
+  year={2009},
+  publisher={IEEE}
+}
+
+@article{durou2008numerical,
+  title={Numerical methods for shape-from-shading: A new survey with benchmarks},
+  author={Durou, Jean-Denis and Falcone, Maurizio and Sagona, Manuela},
+  journal={Computer Vision and Image Understanding},
+  volume={109},
+  number={1},
+  pages={22--43},
+  year={2008},
+  publisher={Elsevier}
+}
+
+@article{zhang1999shape,
+  title={Shape-from-shading: a survey},
+  author={Zhang, Ruo and Tsai, Ping-Sing and Cryer, James Edwin and Shah, Mubarak},
+  journal={IEEE transactions on pattern analysis and machine intelligence},
+  volume={21},
+  number={8},
+  pages={690--706},
+  year={1999},
+  publisher={IEEE}
+}
+
+@article{favaro2005geometric,
+  title={A geometric approach to shape from defocus},
+  author={Favaro, Paolo and Soatto, Stefano},
+  journal={IEEE Transactions on Pattern Analysis and Machine Intelligence},
+  volume={27},
+  number={3},
+  pages={406--417},
+  year={2005},
+  publisher={IEEE}
+}
+
+@article{lhuillier2005quasi,
+  title={A quasi-dense approach to surface reconstruction from uncalibrated images},
+  author={Lhuillier, Maxime and Quan, Long},
+  journal={IEEE transactions on pattern analysis and machine intelligence},
+  volume={27},
+  number={3},
+  pages={418--433},
+  year={2005},
+  publisher={IEEE}
+}
+
+@inproceedings{campbell2008using_2,
+  title={Using multiple hypotheses to improve depth-maps for multi-view stereo},
+  author={Campbell, Neill DF and Vogiatzis, George and Hern{\'a}ndez, Carlos and Cipolla, Roberto},
+  booktitle={European Conference on Computer Vision},
+  pages={766--779},
+  year={2008},
+  organization={Springer}
+}
+
+@inproceedings{romanoni2019tapa_7,
+  title={Tapa-mvs: Textureless-aware patchmatch multi-view stereo},
+  author={Romanoni, Andrea and Matteucci, Matteo},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={10413--10422},
+  year={2019}
+}
+
+@inproceedings{galliani2015massively_14,
+  title={Massively parallel multiview stereopsis by surface normal diffusion},
+  author={Galliani, Silvano and Lasinger, Katrin and Schindler, Konrad},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={873--881},
+  year={2015}
+}
+
+@inproceedings{schonberger2016pixelwise_40,
+  title={Pixelwise view selection for unstructured multi-view stereo},
+  author={Sch{\"o}nberger, Johannes L and Zheng, Enliang and Frahm, Jan-Michael and Pollefeys, Marc},
+  booktitle={European Conference on Computer Vision},
+  pages={501--518},
+  year={2016},
+  organization={Springer}
+}
+
+@article{tola2012efficient_44,
+  title={Efficient large-scale multi-view stereo for ultra high-resolution image sets},
+  author={Tola, Engin and Strecha, Christoph and Fua, Pascal},
+  journal={Machine Vision and Applications},
+  volume={23},
+  number={5},
+  pages={903--920},
+  year={2012},
+  publisher={Springer}
+}
+
+@inproceedings{yao2017relative_51,
+  title={Relative camera refinement for accurate dense reconstruction},
+  author={Yao, Yao and Li, Shiwei and Zhu, Siyu and Deng, Hanyu and Fang, Tian and Quan, Long},
+  booktitle={2017 International Conference on 3D Vision (3DV)},
+  pages={185--194},
+  year={2017},
+  organization={IEEE}
+}
+
+@inproceedings{hartmann2017learned_16,
+  title={Learned multi-patch similarity},
+  author={Hartmann, Wilfried and Galliani, Silvano and Havlena, Michal and Van Gool, Luc and Schindler, Konrad},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={1586--1594},
+  year={2017}
+}
+
+@inproceedings{ji2017surfacenet_20,
+  title={Surfacenet: An end-to-end 3d neural network for multiview stereopsis},
+  author={Ji, Mengqi and Gall, Juergen and Zheng, Haitian and Liu, Yebin and Fang, Lu},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={2307--2315},
+  year={2017}
+}
+
+@inproceedings{chen2019point,
+  title={Point-based multi-view stereo network},
+  author={Chen, Rui and Han, Songfang and Xu, Jing and Su, Hao},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={1538--1547},
+  year={2019}
+}
+
+@inproceedings{luo2019pmvsnet,
+  title={P-mvsnet: Learning patch-wise matching confidence aggregation for multi-view stereo},
+  author={Luo, Keyang and Guan, Tao and Ju, Lili and Huang, Haipeng and Luo, Yawei},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={10452--10461},
+  year={2019}
+}
+
+@article{gu2019cascade,
+  title={Cascade Cost Volume for High-Resolution Multi-View Stereo and Stereo Matching},
+  author={Gu, Xiaodong and Fan, Zhiwen and Zhu, Siyu and Dai, Zuozhuo and Tan, Feitong and Tan, Ping},
+  journal={arXiv preprint arXiv:1912.06378},
+  year={2019}
+}
+
+% datasets
+@article{chang2015shapenet,
+  title={Shapenet: An information-rich 3d model repository},
+  author={Chang, Angel X and Funkhouser, Thomas and Guibas, Leonidas and Hanrahan, Pat and Huang, Qixing and Li, Zimo and Savarese, Silvio and Savva, Manolis and Song, Shuran and Su, Hao and others},
+  journal={arXiv preprint arXiv:1512.03012},
+  year={2015}
+}
+
+@inproceedings{sun2018pix3d,
+  title={Pix3d: Dataset and methods for single-image 3d shape modeling},
+  author={Sun, Xingyuan and Wu, Jiajun and Zhang, Xiuming and Zhang, Zhoutong and Zhang, Chengkai and Xue, Tianfan and Tenenbaum, Joshua B and Freeman, William T},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={2974--2983},
+  year={2018}
+}
+
+@inproceedings{xiang2014beyond,
+  title={Beyond pascal: A benchmark for 3d object detection in the wild},
+  author={Xiang, Yu and Mottaghi, Roozbeh and Savarese, Silvio},
+  booktitle={IEEE winter conference on applications of computer vision},
+  pages={75--82},
+  year={2014},
+  organization={IEEE}
+}
+
+@inproceedings{dai2017scannet,
+  title={Scannet: Richly-annotated 3d reconstructions of indoor scenes},
+  author={Dai, Angela and Chang, Angel X and Savva, Manolis and Halber, Maciej and Funkhouser, Thomas and Nie{\ss}ner, Matthias},
+  booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  pages={5828--5839},
+  year={2017}
+}
+
+% attention
+@inproceedings{vaswani2017attention,
+  title={Attention is all you need},
+  author={Vaswani, Ashish and Shazeer, Noam and Parmar, Niki and Uszkoreit, Jakob and Jones, Llion and Gomez, Aidan N and Kaiser, {\L}ukasz and Polosukhin, Illia},
+  booktitle={Advances in neural information processing systems},
+  pages={5998--6008},
+  year={2017}
+}
+
+@article{hu2019randla,
+  title={RandLA-Net: Efficient Semantic Segmentation of Large-Scale Point Clouds},
+  author={Hu, Qingyong and Yang, Bo and Xie, Linhai and Rosa, Stefano and Guo, Yulan and Wang, Zhihua and Trigoni, Niki and Markham, Andrew},
+  journal={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
+  year={2020}
+}
+
+@article{yang2020robust,
+  title={Robust attentional aggregation of deep feature sets for multi-view 3D reconstruction},
+  author={Yang, Bo and Wang, Sen and Markham, Andrew and Trigoni, Niki},
+  journal={International Journal of Computer Vision},
+  volume={128},
+  number={1},
+  pages={53--73},
+  year={2020},
+  publisher={Springer}
+}
+
+@inproceedings{chorowski2015attention,
+  title={Attention-based models for speech recognition},
+  author={Chorowski, Jan K and Bahdanau, Dzmitry and Serdyuk, Dmitriy and Cho, Kyunghyun and Bengio, Yoshua},
+  booktitle={Advances in neural information processing systems},
+  pages={577--585},
+  year={2015}
+}
+
+@inproceedings{luong2015effective,
+    title = "Effective Approaches to Attention-based Neural Machine Translation",
+    author = "Luong, Thang  and
+      Pham, Hieu  and
+      Manning, Christopher D.",
+    booktitle = "Proceedings of the 2015 Conference on Empirical Methods in Natural Language Processing",
+    month = sep,
+    year = "2015",
+    address = "Lisbon, Portugal",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/D15-1166",
+    doi = "10.18653/v1/D15-1166",
+    pages = "1412--1421",
+}
+
+# misc
+@inproceedings{kato2018renderer,
+    title={Neural 3D Mesh Renderer},
+    author={Kato, Hiroharu and Ushiku, Yoshitaka and Harada, Tatsuya},
+    booktitle={The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+    year={2018}
+}
+
+@inproceedings{liu2019soft,
+  title={Soft rasterizer: A differentiable renderer for image-based 3d reasoning},
+  author={Liu, Shichen and Li, Tianye and Chen, Weikai and Li, Hao},
+  booktitle={Proceedings of the IEEE International Conference on Computer Vision},
+  pages={7708--7717},
+  year={2019}
+}
+
+@article{lambert2016adaptiveberhu,
+  title={The adaptive BerHu penalty in robust regression},
+  author={Lambert-Lacroix, Sophie and Zwald, Laurent},
+  journal={Journal of Nonparametric Statistics},
+  volume={28},
+  number={3},
+  pages={487--514},
+  year={2016},
+  publisher={Taylor \& Francis}
+}
+
+@article{tang2018ba,
+  title={Ba-net: Dense bundle adjustment network},
+  author={Tang, Chengzhou and Tan, Ping},
+  journal={arXiv preprint arXiv:1806.04807},
+  year={2018}
+}
+
+@inproceedings{laina2016deeper,
+  title={Deeper depth prediction with fully convolutional residual networks},
+  author={Laina, Iro and Rupprecht, Christian and Belagiannis, Vasileios and Tombari, Federico and Navab, Nassir},
+  booktitle={2016 Fourth international conference on 3D vision (3DV)},
+  pages={239--248},
+  year={2016},
+  organization={IEEE}
+}
+
+@inproceedings{lin2017featurepyramid,
+  title={Feature pyramid networks for object detection},
+  author={Lin, Tsung-Yi and Doll{\'a}r, Piotr and Girshick, Ross and He, Kaiming and Hariharan, Bharath and Belongie, Serge},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={2117--2125},
+  year={2017}
+}
+
+@article{simonyan2014vgg,
+  title={Very deep convolutional networks for large-scale image recognition},
+  author={Simonyan, Karen and Zisserman, Andrew},
+  journal={arXiv preprint arXiv:1409.1556},
+  year={2014}
+}
+
+@inproceedings{long2015fully,
+  title={Fully convolutional networks for semantic segmentation},
+  author={Long, Jonathan and Shelhamer, Evan and Darrell, Trevor},
+  booktitle={Proceedings of the IEEE conference on computer vision and pattern recognition},
+  pages={3431--3440},
+  year={2015}
+}
+
+@article{konolige1997improved,
+  title={Improved occupancy grids for map building},
+  author={Konolige, Kurt},
+  journal={Autonomous Robots},
+  volume={4},
+  number={4},
+  pages={351--367},
+  year={1997},
+  publisher={Springer}
+}
+

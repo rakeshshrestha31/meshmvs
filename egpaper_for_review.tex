@@ -1,0 +1,93 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{iccv}
+\usepackage{times}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+% Include other packages here, before hyperref.
+\input{math_commands.tex}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{multirow}
+\usepackage{subfigure}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{epsfig}
+\usepackage{verbatim}
+
+% If you comment hyperref and then uncomment it, you should delete
+% egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
+% run, let it finish, and you should be clear).
+\usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
+
+% \iccvfinalcopy % *** Uncomment this line for the final submission
+
+\def\iccvPaperID{****} % *** Enter the ICCV Paper ID here
+\def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
+
+% Pages are numbered in submission mode, and unnumbered in camera-ready
+\ificcvfinal\pagestyle{empty}\fi
+
+\begin{document}
+
+%%%%%%%%% TITLE
+\title{MeshMVS: Multi-View Stereo Guided Mesh Reconstruction}
+
+\author{First Author\\
+Institution1\\
+Institution1 address\\
+{\tt\small firstauthor@i1.org}
+% For a paper whose authors are all at the same institution,
+% omit the following lines up until the closing ``}''.
+% Additional authors and addresses can be added with ``\and'',
+% just like the second author.
+% To save space, use either the email address or home page, not both
+\and
+Second Author\\
+Institution2\\
+First line of institution2 address\\
+{\tt\small secondauthor@i2.org}
+}
+
+\maketitle
+% Remove page # from the first page of camera-ready.
+\ificcvfinal\thispagestyle{empty}\fi
+
+\newcommand{\todo}[1]{{\textcolor{red}{\bf [#1]}}}
+% \newcommand{\siyu}[1]{{\color{blue}[Siyu: #1]}}
+% command for Siyu's comment is already in authorname.sty
+
+\newcommand{\figref}[1]{Figure~\ref{fig:#1}}
+\newcommand{\tabref}[1]{Table~\ref{tab:#1}}
+\newcommand{\equref}[1]{Equation~(\ref{equ:#1})}
+\newcommand{\secref}[1]{Section~\ref{sec:#1}}
+\newcommand{\subsecref}[1]{Sub-section~\ref{subsec:#1}}
+\newcommand{\tableref}[1]{Table~\ref{table:#1}}
+
+%%%%%%%%% BODY TEXT
+\input{body/abstract.tex}
+\input{body/introduction.tex}
+%%%%%%%%% Related works
+\input{body/related-work.tex}
+%%%%%%%%% The Proposed Architecture
+\input{body/method.tex}
+%%%%%%%%% Experiments
+\input{body/experiments.tex}
+%%%%%%%%% Conclusion
+\input{body/conclusion.tex}
+
+{\small
+\bibliographystyle{ieee_fullname}
+\bibliography{egbib}
+}
+
+\end{document}

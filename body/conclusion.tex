@@ -1,0 +1,10 @@
+\section{Conclusion}
+
+We propose a neural network based solution to predict 3D triangle mesh models of objects from images taken from multiple views.
+First, we propose a multi-view voxel grid prediction module which probabilistically merges voxel grids predicted from individual input views.
+We then cubify the merged voxel grid to triangle mesh and apply graph convolutional networks for further refining the mesh.
+The features for the mesh vertices are extracted from contrastive depth input consisting of rendered depths at each refinement stage along with the predicted depths.
+The proposed mesh reconstruction method outperforms existing methods with a large margin and is capable of reconstructing objects with more complex topologies.
+% Our system exploits the recent developments on multi-view depth prediction to inform the mesh generation process and obtains state-of-the-art performance.
+% We also present a novel method for aggregating features from multiple images which takes into account the importance of each view for predicting different parts of the objects.
+

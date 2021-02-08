@@ -1,0 +1,53 @@
+% \begin{table}[ht]
+% \begin{center}
+% \footnotesize
+% \begin{tabular}{c | c c c c c c}
+%     \hline
+%     Metric & RGB-Ours & Depth-Ours & RGBD-Ours & RGB 1-view & Depth 1-view & RGBD 1-view \\
+%     \hline
+%     F1-$\tau$   & 31.27 & 30.30 & 31.61 & 25.19 & 23.78 & 26.06 \\
+%     F1-$2\tau$  & 44.46 & 43.16 & 44.86 & 36.75 & 35.14 & 37.74 \\
+%     \hline
+% \end{tabular}
+% \end{center}
+% \caption{
+%     Accuracy of predicted voxel of individual views against probabilistically merged multi-view voxel grids, where the first three columns indicate the accuracy of multi-view voxel generations while the last three columns show single-view. The voxel branch was trained separately without the mesh refinement. Evaluation is conducted after cubify and the depth maps are generated from MVSNet.
+% }
+% \label{table:multiview_voxel_accuracy}
+% \end{table}
+\begin{table}[ht]
+\noindent \scriptsize \footnotesize
+\begin{minipage}[t]{0.5\textwidth}
+\centering
+\begin{tabular}{c | c c}
+    \hline
+    Metric      & Single-view & Multi-view \\
+    \hline
+    F1-$\tau$   & 25.19 & 31.27 \\
+    F1-$2\tau$  & 36.75 & 44.46 \\
+    \hline
+\end{tabular}
+\caption{
+    \textbf{Accuracy of predicted voxel grids} from single-view prediction compared against the proposed probabilistically merged multi-view voxel grids. The voxel branch was trained separately without the mesh refinement and evaluation was performed on the cubified voxel grids. We use three views for probabilistic grid merging.
+}
+\label{table:multiview_voxel_accuracy}
+\end{minipage}
+\hspace{0.1cm}
+\noindent \scriptsize \footnotesize
+\begin{minipage}[t]{0.5\textwidth}
+\centering
+\begin{tabular}{c | c c c c}
+    \hline
+    Metric & Cubified & Stage-1 & Stage-2 & Stage-3 \\
+    \hline
+    F1-$\tau$   & 31.48 & 76.78 & 79.88 & 80.80  \\
+    F1-$2\tau$  & 44.40 & 88.32 & 90.19 & 90.72  \\
+    \hline
+\end{tabular}
+\caption{
+    \textbf{Accuracy of the refined meshes at different GCN stages}. 1, 2 and 3 indicate the performance at the corresponding graph convolution blocks while \emph{Cubified} is for the cubified voxel grids used as input for the first GCN block. All the stages, including the voxel prediction, were trained jointly and hence the accuracy of voxel predictions varies from that in~\tableref{multiview_voxel_accuracy}.
+}
+\label{table:gcn_stages}
+\end{minipage}
+\end{table}
+

@@ -1,0 +1,34 @@
+\begin{table}[ht]
+\begin{center}
+% \resizebox{\linewidth}{!}{
+\begin{tabular}{|c|ccccc|}
+    \hline
+    \multirow{2}{*}{Category}&
+    \multicolumn{5}{c|}{Chamfer Distance (CD) $\downarrow$} \\
+    & 3D-R2N2 & LSM & MVP2M & P2M++ & \bf{Ours} \\
+    \hline
+    Couch       & 0.806 & 0.730 & 0.534 & 0.439 & \bf{0.220} \\
+    Cabinet     & 0.613 & 0.634 & 0.488 & 0.337 & \bf{0.230} \\
+    Bench       & 1.362 & 0.572 & 0.591 & 0.549 & \bf{0.159} \\
+    Chair       & 1.534 & 0.495 & 0.583 & 0.461 & \bf{0.201} \\
+    Monitor     & 1.465 & 0.592 & 0.658 & 0.566 & \bf{0.217} \\
+    Firearm     & 0.432 & 0.385 & 0.305 & 0.305 & \bf{0.123} \\
+    Speaker     & 1.443 & 0.767 & 0.745 & 0.635 & \bf{0.402} \\
+    Lamp        & 6.780 & 1.768 & 0.980 & 1.135 & \bf{0.755} \\
+    Cellphone   & 1.161 & 0.362 & 0.445 & 0.325 & \bf{0.138} \\
+    Plane       & 0.854 & 0.496 & 0.403 & 0.422 & \bf{0.084} \\
+    Table       & 1.243 & 0.994 & 0.511 & 0.388 & \bf{0.181} \\
+    Car         & 0.358 & 0.326 & 0.321 & 0.249 & \bf{0.165} \\
+    Watercraft  & 0.869 & 0.509 & 0.463 & 0.508 & \bf{0.175} \\
+    \hline
+    Mean        & 1.455 & 0.664 & 0.541 & 0.486 & \bf{0.211} \\
+    \hline
+\end{tabular}
+% }
+\end{center}
+\caption{
+    \textbf{Qualitative comparison} against state-of-the-art multi-view shape generation methods. Following~\cite{wen2019pixel2mesh++}, we report Chamfer Distance in $m^2 \times 1000$ from ground truth for different methods. Note that same model is trained for all the categories but accuracy on individual categories as well as average over all the categories are evaluated.
+}
+\label{table:baseline_comparison_cd}
+\end{table}
+

@@ -1,0 +1,23 @@
+\begin{table}[ht]
+\begin{center}
+\footnotesize
+\begin{tabular}{c c | c c}
+\toprule[1pt]
+    Voxel branch    & Mesh branch   & F1-$\tau$         & F1-$2\tau$ \\ \hline
+    RGB             & RGB           & 79.66             & 89.98 \\
+    Depth           & Depth         & 77.07             & 88.20 \\
+    RGB-D           & RGB           & 78.42             & 89.32 \\
+    RGB             & RGB-D         & \textbf{80.80}    & \textbf{90.55} \\
+    % RGB-D         & RGBD-D        & \textbf{81.15}    & \textbf{90.92}
+\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\caption{
+    Accuracy with different input modalities of voxel and mesh.
+    % \rakesh{More extensive combinations of input modalities can be performed if needed}
+    % Using RGB-D for both voxel and mesh branch gave the best results with the most recent architecture
+    % but all the other ablation study experiments were performed with RGB+RGB-D, so we are not reporting RGBD+RGBD to avoid confusion
+}
+\label{table:input_modality_accuracy}
+\end{table}
+

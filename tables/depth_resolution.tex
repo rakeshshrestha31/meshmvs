@@ -1,0 +1,18 @@
+\begin{table}[ht]
+% \captionsetup{font=footnotesize,labelfont=footnotesize}
+\begin{center}
+\footnotesize
+\begin{tabular}{l | c c c c}
+    \hline
+    Metric & 24 & 48 & 72 & 96  \\
+    \hline
+    F1-$\tau$  & 80.29 & 80.80 & 80.69 & 80.34   \\
+    F1-$2\tau$ & 90.43 & 90.72 & 90.74 & 90.47   \\
+    \hline
+\end{tabular}
+\end{center}
+\caption{
+    \textbf{Accuracy w.r.t the number of depth hypothesis}. A higher number of depth hypothesis increases the resolution of predicted depth values at the expense of higher memory requirement. The range of depths for all the models are same and based on the minimum/maximum depth in the ShapeNet~\cite{chang2015shapenet} dataset.
+}
+\label{table:depth_resolution}
+\end{table}

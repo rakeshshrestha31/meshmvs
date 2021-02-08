@@ -1,0 +1,22 @@
+# tex temp files
+*.aux
+*.log
+*.out
+*.synctex.gz
+*.dvi
+
+# bibtex temp files
+*.bbl
+*.blg
+
+# main pdf
+neurips_2020.pdf
+iclr_2021.pdf
+egpaper_for_review.pdf
+
+# vim temp swap file
+*.swp
+*.swo
+*.swn
+*.swm
+

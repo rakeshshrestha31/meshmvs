@@ -1,0 +1,33 @@
+\begin{table}[ht]
+\begin{center}
+\footnotesize
+\begin{tabular}{| c | c c | c c|}
+    \hline
+    \multirow{2}{*}{Category}&
+    \multicolumn{2}{c|}{F-score ($\tau$) $\uparrow$}&
+    \multicolumn{2}{c|}{F-score ($2\tau$) $\uparrow$}\\
+    & Excluding & Including
+    & Excluding & Including \\
+    \hline
+    Couch       & 63.29 & 73.63 & 80.79 & 88.24 \\
+    Cabinet     & 68.26 & 76.39 & 83.10 & 88.84 \\
+    Bench       & 76.08 & 83.76 & 87.42 & 92.57 \\
+    Chair       & 60.60 & 78.69 & 75.93 & 90.02 \\
+    Monitor     & 67.26 & 76.64 & 81.57 & 88.89 \\
+    Firearm     & 78.59 & 94.32 & 86.28 & 97.67 \\
+    Speaker     & 62.39 & 67.83 & 77.77 & 82.34 \\
+    Lamp        & 63.50 & 75.93 & 74.66 & 85.33 \\
+    Cellphone   & 67.24 & 86.45 & 80.54 & 94.28 \\
+    Plane       & 57.48 & 92.13 & 67.27 & 96.57 \\
+    Table       & 76.41 & 83.68 & 86.86 & 91.97 \\
+    Car         & 59.08 & 80.43 & 75.58 & 92.33 \\
+    Watercraft  & 64.97 & 80.48 & 78.95 & 90.35 \\
+    \hline
+\end{tabular}
+\end{center}
+\caption{
+    \textbf{Accuracy when a category is excluded} during training and evaluation is performed on the category to verify how well training on other categories generalizes to the excluded category.
+}
+\label{table:train_except_one_category}
+\end{table}
+

@@ -1,0 +1,63 @@
+% \begin{table}[ht]
+% \begin{center}
+% \resizebox{\linewidth}{!}{
+% \begin{tabular}{|c|c|c|c|c|c|c|}
+%     \hline
+%     Metric & Ours-P2M & - rendered depth loss & - contrastive depth & stats pooling & simple attention & GT-depth \\
+%     \hline
+%     F1-$\tau$ & TBD & TBD & TBD & TBD & TBD & \textbf{TBD} \\
+%     F1-$2\tau$ & TBD & TBD & TBD & TBD & TBD & \textbf{TBD} \\
+%     % Chamfer distance (mm) & 0.30 & 0.33 & 0.33 & 0.325 & 0.30 & \textbf{0.18} \\
+%     \hline
+% \end{tabular}}
+% \end{center}
+% \caption{
+%     Ablation Study. ${\tau}$=$10^{-4}$ m$^2$
+% }
+% \label{table:ablation_study_p2m}
+% \end{table}
+
+\begin{table}[ht]
+% \captionsetup{font=footnotesize,labelfont=footnotesize}
+\begin{center}
+\footnotesize
+\begin{tabular}{ l c c }
+\toprule[1pt]
+ &F1-$\tau$ &F1-2$\tau$   \\ \hline
+(1) Naive multi-view Mesh R-CNN \qquad \qquad  \qquad  \qquad  \qquad & 72.74 & 84.99 \\
+(2) + Multi-view voxel grid prediction & 76.97 & 88.24 \\
+(3) + Contrastive depth input             & 79.63 & 90.10 \\
+(4) + Multi-head attention pooling   & 79.82    & 90.18  \\
+(5) \bf{+ Contrastive depth loss (final model)}  & \textbf{80.80} & \textbf{90.72}\\
+% (6) Baseline + rendered vs GT depth loss    & 80.35 & 90.55 \\
+% (7) Baseline + rendered vs predicted depth loss + rendered vs GT depth loss    & 80.45 & 90.56 \\
+% (8) Baseline with simple attention          & 80.03 & 90.21 \\
+(6) Using GT depth (final model)                 & \textbf{84.58} & \textbf{92.86} \\
+% (10) Sphere initialization                  & 73.78 & 85.49 \\
+\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\vspace{-4mm}
+\caption{
+    \textbf{Comparison of shape generation accuracy with different settings} of additional contrastive depth losses, multi-view feature pooling.
+    The Baseline framework uses multi-head attention mechanism without any contrastive depth losses.
+}
+\label{table:ablation_study}
+\end{table}
+
+% \begin{table}[t]
+% % \captionsetup{font=footnotesize,labelfont=footnotesize}
+% \begin{center}
+% \footnotesize
+% \begin{tabular}{ l c c }
+% \toprule[1pt]
+%  &F1-$\tau$ &F1-2$\tau$ \\ \hline
+% With Perceptual Feature Loss \qquad \qquad  \qquad  \qquad  \qquad  & 74.87 & 86.92 \\
+% Without Perceptual Feature Loss & 75.30 & 87.12 \\
+% \bottomrule[1pt]
+% \end{tabular}
+% \end{center}
+% \caption{Comparisons of different contrastive depth formulations, where \emph{Pred} indicates predicted depth map from MVSNet, \emph{Rend} indicates rendered depth map from deformed mesh model, $\ominus$ means element-wise minus, $\otimes$ means concatenation. In 1 and 2 concatenation and difference of the depths are fed to VGG feature extractor while in 3 and 4 concatenation and difference of the VGG features from the depths is used for mesh refinement \rakesh{Note: These results will be updated with the results from our final architecture}}
+% \label{table:perceptual_loss}
+% \end{table}
+
