@@ -164,7 +164,8 @@ def main_worker_eval(worker_id, args):
 
         save_predictions(
             model, test_loader, prediction_dir,
-            args.eval_save_point_clouds, args.eval_save_meshes
+            args.eval_save_point_clouds, args.eval_save_meshes,
+            args.eval_save_initial_meshes
         )
     # else:
     #     evaluate_test(model, test_loader)
@@ -490,7 +491,10 @@ def eval_and_save(
 
 
 @torch.no_grad()
-def save_predictions(model, loader, output_dir, save_point_clouds, save_meshes):
+def save_predictions(
+    model, loader, output_dir,
+    save_point_clouds, save_meshes, save_initial_meshes
+):
     """
     This function is used save predicted and gt meshes
     """
@@ -543,11 +547,12 @@ def save_predictions(model, loader, output_dir, save_point_clouds, save_meshes):
         #             filename, (view * P2M_SCALE).cpu().detach().numpy()
         #         )
 
-        # if "init_meshes" in model_outputs:
-        #     save_p2m_format(
-        #         batch, model_outputs["init_meshes"],
-        #         gt_mesh, gt_points, output_dir, "10"
-        #     )
+        if save_initial_meshes and "init_meshes" in model_outputs:
+            save_p2m_format(
+                batch, model_outputs["init_meshes"],
+                gt_mesh, gt_points, output_dir, "10",
+                False, True
+            )
 
         # only the last stage
         # gcn_stages = [len(model_outputs["meshes_pred"])-1]

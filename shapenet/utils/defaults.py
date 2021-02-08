@@ -38,6 +38,11 @@ def default_argument_parser():
         action="store_true",
         help="whether to save meshes during evaluation",
     )
+    parser.add_argument(
+        "--eval-save-initial-meshes",
+        action="store_true",
+        help="whether to save initial meshes during evaluation",
+    )
     parser.add_argument("--no-color", action="store_true", help="disable colorful logging")
     parser.add_argument("--num-gpus", type=int, default=1, help="number of gpus per machine")
     parser.add_argument("--num-machines", type=int, default=1)
