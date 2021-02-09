@@ -14,7 +14,7 @@ import numpy as np
 
 from shapenet.modeling.backbone import build_backbone, build_custom_backbone
 from shapenet.modeling.heads import \
-        MeshRefinementHead, VoxelHead, MVSNet, DepthRenderer, \
+        MeshRefinementHead, VoxelHead, VoxelRefineHead, MVSNet, DepthRenderer, \
         MultiHeadAttentionFeaturePooling, SimpleAttentionFeaturePooling
 from shapenet.modeling.voxel_ops import \
         dummy_mesh, add_dummy_meshes, cubify, merge_multi_view_voxels, logit
@@ -1056,7 +1056,9 @@ class MeshDepthHead(VoxMeshDepthHead):
         nn.Module.__init__(self)
         self.setup(cfg)
         self.init_mvsnet(cfg)
-        self.init_mesh_head(cfg)
+        if not cfg.MODEL.VOXEL_REFINE_HEAD.VOXEL_ONLY:
+            self.init_mesh_head(cfg)
+        self.voxel_refine_head = VoxelRefineHead(cfg)
         self.noise_filter_size = cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_SIZE
         self.noise_filter_padding = (self.noise_filter_size -1) // 2
         self.noise_filter_threshold = cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_THRESHOLD
@@ -1212,16 +1214,28 @@ class MeshDepthHead(VoxMeshDepthHead):
         # save_depths(masked_depths, "{}_masked_depth".format(timestamp))
         # exit(0)
 
+        vox_scores = self.voxel_refine_head(vox_scores.unsqueeze(1)).squeeze(1)
         cubified_meshes = cubify(
             vox_scores,
             self.voxel_size, self.cubify_threshold
         )
 
-        mesh_head_output = self.forward_mesh_head(
-            imgs, masked_depths,
-            intrinsics, extrinsics,
-            masks, cubified_meshes, **kwargs
-        )
+        if self.cfg.MODEL.VOXEL_REFINE_HEAD.VOXEL_ONLY:
+            # the mesh head is missing
+            mesh_head_output = {}
+        elif voxel_only:
+            dummy_meshes = dummy_mesh(batch_size, device)
+            mesh_head_output = self.forward_mesh_head(
+                imgs, masked_depths,
+                intrinsics, extrinsics,
+                masks, dummy_meshes, **kwargs
+            )
+        else:
+            mesh_head_output = self.forward_mesh_head(
+                imgs, masked_depths,
+                intrinsics, extrinsics,
+                masks, cubified_meshes, **kwargs
+            )
 
         return {
             **mesh_head_output,

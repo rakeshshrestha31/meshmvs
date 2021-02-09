@@ -283,11 +283,13 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
 
             with Timer("Forward"):
                 model_outputs = model(batch["imgs"], **model_kwargs)
-                voxel_scores = model_outputs["voxel_scores"]
-                meshes_pred = model_outputs["meshes_pred"]
+                voxel_scores = model_outputs.get("voxel_scores", None)
+                meshes_pred = model_outputs.get("meshes_pred", [])
                 merged_voxel_scores = model_outputs.get(
                     "merged_voxel_scores", None
                 )
+
+            loss, losses = None, {}
 
             num_infinite = 0
             for cur_meshes in meshes_pred:
@@ -297,7 +299,6 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 logger.info("ERROR: Got %d non-finite verts" % num_infinite)
                 return
 
-            loss, losses = None, {}
             if num_infinite == 0:
                 loss, losses = loss_fn(
                     voxel_scores, merged_voxel_scores,
@@ -319,6 +320,8 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     if not torch.any(torch.isnan(depth_loss)):
                         loss = loss \
                              + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
+                    else:
+                        logger.info("WARNING: Got NaN depth loss")
                     losses["pred_depth_loss"] = depth_loss
                 if "rendered_depths" in model_outputs \
                         and not model_kwargs.get("voxel_only", False):
@@ -554,17 +557,19 @@ def save_predictions(
                 False, True
             )
 
-        # only the last stage
-        # gcn_stages = [len(model_outputs["meshes_pred"])-1]
-        # all stages
-        gcn_stages = range(len(model_outputs["meshes_pred"]))
-        for gcn_stage in gcn_stages:
-            pred_mesh = model_outputs["meshes_pred"][gcn_stage]
-            file_prefix = str(gcn_stage)
-            save_p2m_format(
-                batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix,
-                save_point_clouds, save_meshes
-            )
+
+        if "meshes_pred" in model_outputs:
+            # only the last stage
+            # gcn_stages = [len(model_outputs["meshes_pred"])-1]
+            # all stages
+            gcn_stages = range(len(model_outputs["meshes_pred"]))
+            for gcn_stage in gcn_stages:
+                pred_mesh = model_outputs["meshes_pred"][gcn_stage]
+                file_prefix = str(gcn_stage)
+                save_p2m_format(
+                    batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix,
+                    save_point_clouds, save_meshes
+                )
 
 def save_p2m_format(
         batch, pred_mesh, gt_mesh, gt_points, output_dir, file_prefix,

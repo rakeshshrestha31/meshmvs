@@ -177,14 +177,16 @@ def evaluate_test_p2m(model, data_loader):
             model_kwargs["masks"] = batch["masks"]
 
         model_outputs = model(batch["imgs"], **model_kwargs)
-        meshes_pred = model_outputs["meshes_pred"]
-        # meshes_pred = model_outputs["init_meshes"]
+        meshes_pred = model_outputs.get("meshes_pred", [])
+        # meshes_pred = model_outputs("init_meshes", [])
 
         # NOTE that for the F1 thresholds we take 1e-4 & 2e-4 in m^2 units
         # Following Pixel2Mesh, the squared L2 (L2^2) is computed
-        cur_mesh_metrics = compare_meshes_p2m(
-            meshes_pred[-1], batch["meshes"]
-        )
+        cur_mesh_metrics = None
+        if len(meshes_pred):
+            cur_mesh_metrics = compare_meshes_p2m(
+                meshes_pred[-1], batch["meshes"]
+            )
 
         cur_vox_metrics = None
         if "merged_voxel_scores" in model_outputs:
@@ -199,7 +201,9 @@ def evaluate_test_p2m(model, data_loader):
             # chamfer[sid] += cur_mesh_metrics["Chamfer-L2"][i].item()
             # normal[sid] += cur_mesh_metrics["AbsNormalConsistency"][i].item()
 
-            update_scores(scores["mesh"], cur_mesh_metrics, i, sid, id_strs[i])
+            if cur_mesh_metrics is not None:
+                update_scores(scores["mesh"], cur_mesh_metrics, i, sid, id_strs[i])
+
             if cur_vox_metrics is not None:
                 update_scores(scores["vox"], cur_vox_metrics, i, sid, id_strs[i])
 
@@ -248,7 +252,7 @@ def evaluate_split(
     predictions = defaultdict(list)
     metrics = defaultdict(list)
     deprocess = imagenet_deprocess(rescale_image=False)
-    for batch in loader:
+    for batch_idx, batch in enumerate(tqdm.tqdm(loader)):
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
@@ -260,18 +264,19 @@ def evaluate_split(
             if module.cfg.MODEL.USE_GT_DEPTH:
                 model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
-        meshes_pred = model_outputs["meshes_pred"]
+        meshes_pred = model_outputs.get("meshes_pred", [])
         voxel_scores = model_outputs["voxel_scores"]
         merged_voxel_scores = model_outputs.get(
             "merged_voxel_scores", None
         )
 
         # Only compute metrics for the final predicted meshes, not intermediates
-        cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"])
-        if cur_metrics is None:
-            continue
-        for k, v in cur_metrics.items():
-            metrics[k].append(v)
+        if len(meshes_pred):
+            cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"])
+            if cur_metrics is None:
+                continue
+            for k, v in cur_metrics.items():
+                metrics[k].append(v)
 
         voxel_losses = MeshLoss.voxel_loss(
             voxel_scores, merged_voxel_scores, batch["voxels"]
@@ -298,7 +303,7 @@ def evaluate_split(
                     predictions[faces_key].append(faces.cpu().numpy())
 
         num_predictions += len(batch["meshes"])
-        logger.info("Evaluated %d predictions so far" % num_predictions)
+        # logger.info("Evaluated %d predictions so far" % num_predictions)
         if 0 < max_predictions <= num_predictions:
             break
 

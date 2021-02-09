@@ -58,6 +58,13 @@ def get_shapenet_cfg():
     cfg.MODEL.VOXEL_HEAD.NOISE_FILTER_THRESHOLD = 0.33
 
     # ------------------------------------------------------------------------ #
+    # Voxel Refine Head
+    # ------------------------------------------------------------------------ #
+    cfg.MODEL.VOXEL_REFINE_HEAD = CN()
+    cfg.MODEL.VOXEL_REFINE_HEAD.NUM_LAYERS = 2
+    cfg.MODEL.VOXEL_REFINE_HEAD.VOXEL_ONLY = False
+
+    # ------------------------------------------------------------------------ #
     # Mesh Head
     # ------------------------------------------------------------------------ #
     cfg.MODEL.MESH_HEAD = CN()

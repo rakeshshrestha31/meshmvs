@@ -2,6 +2,7 @@
 from .mesh_head import MeshRefinementHead
 from .mesh_loss import MeshLoss
 from .voxel_head import VoxelHead
+from .voxel_refine_head import VoxelRefineHead
 from .mvsnet import MVSNet
 from .depth_renderer import DepthRenderer
 from .multihead_attention import MultiheadAttention
