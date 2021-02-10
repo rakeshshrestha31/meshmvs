@@ -62,7 +62,7 @@ def evaluate_test(model, data_loader, vis_preds=False):
     f1_05 = {i: 0 for i in class_names}
 
     num_batch_evaluated = 0
-    for batch in data_loader:
+    for batch in tqdm.tqdm(data_loader):
         batch = data_loader.postprocess(batch, device)
         sids = [id_str.split("-")[0] for id_str in batch["id_strs"]]
         for sid in sids:
@@ -79,27 +79,28 @@ def evaluate_test(model, data_loader, vis_preds=False):
 
             model_outputs = model(batch["imgs"], **model_kwargs)
             voxel_scores = model_outputs["voxel_scores"]
-            meshes_pred = model_outputs["meshes_pred"]
+            meshes_pred = model_outputs.get("meshes_pred", [])
 
-            cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"], reduce=False)
-            cur_metrics["verts_per_mesh"] = meshes_pred[-1].num_verts_per_mesh().cpu()
-            cur_metrics["faces_per_mesh"] = meshes_pred[-1].num_faces_per_mesh().cpu()
+            if len(meshes_pred):
+                cur_metrics = compare_meshes(meshes_pred[-1], batch["meshes"], reduce=False)
+                cur_metrics["verts_per_mesh"] = meshes_pred[-1].num_verts_per_mesh().cpu()
+                cur_metrics["faces_per_mesh"] = meshes_pred[-1].num_faces_per_mesh().cpu()
 
-            for i, sid in enumerate(sids):
-                chamfer[sid] += cur_metrics["Chamfer-L2"][i].item()
-                normal[sid] += cur_metrics["AbsNormalConsistency"][i].item()
-                f1_01[sid] += cur_metrics["F1@%f" % 0.1][i].item()
-                f1_03[sid] += cur_metrics["F1@%f" % 0.3][i].item()
-                f1_05[sid] += cur_metrics["F1@%f" % 0.5][i].item()
+                for i, sid in enumerate(sids):
+                    chamfer[sid] += cur_metrics["Chamfer-L2"][i].item()
+                    normal[sid] += cur_metrics["AbsNormalConsistency"][i].item()
+                    f1_01[sid] += cur_metrics["F1@%f" % 0.1][i].item()
+                    f1_03[sid] += cur_metrics["F1@%f" % 0.3][i].item()
+                    f1_05[sid] += cur_metrics["F1@%f" % 0.5][i].item()
 
-                if vis_preds:
-                    img = image_to_numpy(deprocess(batch["imgs"][i]))
-                    vis_utils.visualize_prediction(
-                        batch["id_strs"][i], img, meshes_pred[-1][i], "/tmp/output"
-                    )
+                    if vis_preds:
+                        img = image_to_numpy(deprocess(batch["imgs"][i]))
+                        vis_utils.visualize_prediction(
+                            batch["id_strs"][i], img, meshes_pred[-1][i], "/tmp/output"
+                        )
 
             num_batch_evaluated += 1
-            logger.info("Evaluated %d / %d batches" % (num_batch_evaluated, len(data_loader)))
+            # logger.info("Evaluated %d / %d batches" % (num_batch_evaluated, len(data_loader)))
 
     vis_utils.print_instances_class_histogram(
         num_instances,
