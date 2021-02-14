@@ -62,7 +62,8 @@ def evaluate_test(model, data_loader, vis_preds=False):
     f1_05 = {i: 0 for i in class_names}
 
     num_batch_evaluated = 0
-    for batch in tqdm.tqdm(data_loader):
+    # for batch in tqdm.tqdm(data_loader):
+    for batch in data_loader:
         batch = data_loader.postprocess(batch, device)
         sids = [id_str.split("-")[0] for id_str in batch["id_strs"]]
         for sid in sids:
@@ -162,7 +163,8 @@ def evaluate_test_p2m(model, data_loader):
             overall_scores[metric]["object"][id_str] \
                 = batch_scores[metric][sid_idx]
 
-    for batch_idx, batch in enumerate(tqdm.tqdm(data_loader)):
+    # for batch_idx, batch in enumerate(tqdm.tqdm(data_loader)):
+    for batch_idx, batch in enumerate(data_loader):
         batch = data_loader.postprocess(batch, device)
         sids = [id_str.split("-")[0] for id_str in batch["id_strs"]]
         id_strs = [id_str for id_str in batch["id_strs"]]
@@ -253,7 +255,7 @@ def evaluate_split(
     predictions = defaultdict(list)
     metrics = defaultdict(list)
     deprocess = imagenet_deprocess(rescale_image=False)
-    for batch_idx, batch in enumerate(tqdm.tqdm(loader)):
+    for batch_idx, batch in enumerate(loader):
         batch = loader.postprocess(batch, device)
         model_kwargs = {}
         module = model.module if hasattr(model, "module") else model
@@ -337,7 +339,8 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
     device = torch.device("cuda:0")
     metrics = defaultdict(list)
     deprocess = imagenet_deprocess(rescale_image=False)
-    for batch_idx, batch in tqdm.tqdm(enumerate(loader)):
+    # for batch_idx, batch in tqdm.tqdm(enumerate(loader)):
+    for batch_idx, batch in enumerate(loader):
         if max_predictions >= 1 and batch_idx > max_predictions:
             break
         batch = loader.postprocess(batch, device)
