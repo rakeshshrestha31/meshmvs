@@ -226,9 +226,17 @@ def main_worker(worker_id, args):
         cp.store_data("iter_per_epoch", iter_per_epoch)
     else:
         logger.info("Loading model state from checkpoint")
-        model.load_state_dict(cp.latest_states["model"])
-        optimizer.load_state_dict(cp.latest_states["optim"])
-        scheduler.load_state_dict(cp.latest_states["lr_scheduler"])
+
+        if args.train_best_checkpoint:
+            logger.info("using best checkpoint weights")
+            model.load_state_dict(cp.best_states["model"])
+            optimizer.load_state_dict(cp.best_states["optim"])
+            scheduler.load_state_dict(cp.best_states["lr_scheduler"])
+        else:
+            logger.info("using latest checkpoint weights")
+            model.load_state_dict(cp.latest_states["model"])
+            optimizer.load_state_dict(cp.latest_states["optim"])
+            scheduler.load_state_dict(cp.latest_states["lr_scheduler"])
 
     training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn)
 

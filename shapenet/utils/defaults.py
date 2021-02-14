@@ -43,6 +43,11 @@ def default_argument_parser():
         action="store_true",
         help="whether to save initial meshes during evaluation",
     )
+    parser.add_argument(
+        "--train-best-checkpoint",
+        action="store_true",
+        help="whether to use latest checkpoint weights, otherwise best weights are used"
+    )
     parser.add_argument("--no-color", action="store_true", help="disable colorful logging")
     parser.add_argument("--num-gpus", type=int, default=1, help="number of gpus per machine")
     parser.add_argument("--num-machines", type=int, default=1)
