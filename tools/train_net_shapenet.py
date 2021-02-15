@@ -320,17 +320,18 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 skip = True
             # depth losses
             elif "depths" in batch:
-                if "pred_depths" in model_outputs:
-                    depth_loss = adaptive_berhu_loss(
-                        batch["depths"], model_outputs["pred_depths"],
-                        batch["masks"]
-                    )
-                    if not torch.any(torch.isnan(depth_loss)):
-                        loss = loss \
-                             + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
-                    else:
-                        logger.info("WARNING: Got NaN depth loss")
-                    losses["pred_depth_loss"] = depth_loss
+                if not cfg.MODEL.USE_GT_DEPTH:
+                    if "pred_depths" in model_outputs:
+                        depth_loss = adaptive_berhu_loss(
+                            batch["depths"], model_outputs["pred_depths"],
+                            batch["masks"]
+                        )
+                        if not torch.any(torch.isnan(depth_loss)):
+                            loss = loss \
+                                 + (depth_loss * cfg.MODEL.MVSNET.PRED_DEPTH_WEIGHT)
+                        else:
+                            logger.info("WARNING: Got NaN depth loss")
+                        losses["pred_depth_loss"] = depth_loss
                 if "rendered_depths" in model_outputs \
                         and not model_kwargs.get("voxel_only", False):
                     pred_depths = model_outputs["pred_depths"]
