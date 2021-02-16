@@ -297,6 +297,12 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     "merged_voxel_scores", None
                 )
 
+            # debug only
+            if len(meshes_pred) > 0:
+                mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
+                mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
+            logger.info("mesh size = (%r)" % (list(zip(mean_V, mean_F))))
+
             loss, losses = None, {}
 
             num_infinite = 0
