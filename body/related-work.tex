@@ -1,16 +1,28 @@
 \section{Related Work}
+\siyu{I think the classification of related works in Pixel2Mesh++ is more reasonable, that is 3D shape representation, single-view shape generation, and multi-view shape generation.
+The ``Traditional Shape Generation Methods'' can be merged into ``single-view shape generation'' and ``multi-view shape generation''. We donot have to survey ``Depth Estimation'', which seems irrelevant to our approach.}
+
+\textcolor{myRed}{
+\paragraph{3D Shape Representation.} 
+We can discuss about:
+1. Different representations of 3D shape in learning-based approaches. Please refer to the survey in Pixel2Mesh++.
+2. The existed works of initial mesh generation, and especially the limitations of such methods and the effect of initial mesh on the final results.
+3. To overcome such limitations, we use the voxel grid as the 3D representation of the initial mesh, and multi-view ... to obtain the initial mesh.
+\paragraph{Single-view Shape Generation.} 
+Point cloud, voxel grid and mesh... Maybe we can mainly focus on the voxel grid and mesh.
+\paragraph{Multi-view Shape Generation.}
+Mainly focus on the limitations of existed methods and how can we handle such limitations.
+}
 
 \begin{figure*}[t]
 \begin{center}
 \includegraphics[width=\linewidth]{imgs/meshrcnn_architecture.pdf}
 \end{center}
-\vspace{-4mm}
-    \caption{\textbf{Architecture of the proposed method}. The \emph{voxel grid prediction module} predicts coarse voxel grid representation which is further refined by a series of \emph{GCN}s. The GCNs use \emph{contrastive depth features} from rendered depths of the current shape and the predicted depths from \emph{MVSNet}. Multi-view features are pooled using a multi-head attention mechanism.}
-\vspace{-4mm}
+    \caption{\textbf{Architecture of the proposed method}. The \emph{voxel grid prediction module} predicts coarse voxel grid representation which is further refined by a series of \emph{GCN}s. The GCNs use \emph{contrastive depth features} from rendered depths of the current shape and the predicted depths from \emph{MVSNet}. Multi-view features are pooled using a multi-head attention mechanism.\siyu{Replace this figure with a simplified one and add a long caption describing the whole framework.}}
 \label{fig:system_architecture}
 \end{figure*}
 
-\subsection{Traditional Shape Generation Methods}
+\paragraph{Traditional Shape Generation Methods}
 3D model generation has traditionally been tackled using multi-view geometry principles.
 Among them, structure-from-motion (SfM)~\cite{schonberger2016structure,agarwal2011building,cui2015global,cui2017hsfm} and simultaneous localization and mapping (SLAM)~\cite{cadena2016pastslam,mur2015orb,engel2014lsd,whelan2015elasticfusion} are popular techniques that perform 3D reconstruction and camera pose estimation at the same time. These methods extract local image features, match them across images and use the matches to estimate camera poses and 3D geometry.
 % But these methods are limited to texture-rich objects with non-reflective surfaces
@@ -23,7 +35,7 @@ gradually increase the density of points to obtain a final dense point cloud of 
 \cite{durou2008numerical,zhang1999shape,favaro2005geometric} reason about shading, texture and defocus to reason about visible parts of the object and infer its 3D geometry.
 While the results of these works are impressive in terms of quality and completeness of reconstruction, they still struggle with poorly textured and reflective surfaces and require carefully selected input views.
 
-\subsection{Deep Shape Generation Methods}
+\paragraph{Deep Shape Generation Methods}
  Deep learning based approaches can learn to infer 3D structure from training data and can be robust against poorly textured and reflective surfaces as well as limited and arbitrarily selected input views. These methods can be categorized into single view and multi-view methods.
 \cite{huang2015single, su2014estimating} use shape component retrieval and deformation from a large dataset for single-view 3D shape generation.
 \cite{kurenkov2018deformnet} extend this idea by introducing free-form deformation networks on retrieved object templates from a database.
@@ -57,7 +69,7 @@ while \cite{mescheder2019occupancy,park2019deepsdf,liu2019learning,liu2019dist,m
 
 % We refer our readers to a recent survey on Deep Geometry Learning ~\cite{xiao2020survey} for a more comprehensive review of the related work on this topic.
 
-\subsection{Depth Estimation}
+\paragraph{Depth Estimation}
 Compared to 3D shape generation, depth prediction is an easier problem formulation since it simplifies the task to per-view depth map estimation.
 Traditional methods ~\cite{campbell2008using,galliani2015massively,schonberger2016pixelwise} use multi-view stereo principles for depth prediction.
 Deep learning based multi-view stereo depth estimation was first introduced in~\cite{hartmann2017learned_16} where a learned cost metric is used to estimate patch similarities.

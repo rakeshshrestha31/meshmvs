@@ -6,9 +6,12 @@
     Our system first predicts a coarse 3D volume from the color images by probabilistically merging voxel occupancy grids from individual views.
     Depth images corresponding to the multi-view color images are predicted which along with the rendered depth images of the coarse shape are used as a contrastive input whose features guide the refinement of the coarse shape through a series of graph convolution networks.
     Attention-based multi-view feature pooling is proposed to fuse the contrastive depth features from different viewpoints which are fed to the graph convolution networks.
+    
     % Additional constrains between the rendered depths of the predicted shapes and the predicted depth maps are introduced to further regularize the shape generation process.
     % A series of graph convolution networks are applied to refine the shape in a coarse to fine manner all of which utilize contrastive depth input at the current stage of refinement.
 
     We validate the proposed multi-view mesh generation method on ShapeNet, where we obtain a significant improvement with 34\% decrease in chamfer distance to ground truth and 14\% increase in the F1-score compared with the state-of-the-art multi-view shape generation method.
     % \rakesh{chamfer distance current - 1.45 cm, pixel2mesh++- 2.2 cm (the unit of chamfer distance reported in the Pixel2Mesh(++) paper is m^2 * 1000, it might confuse the reviewers/readers if we report these numbers}
 \end{abstract}
+
+\siyu{We should re-summarize the main contributions of the proposed work. Some hints: 1. Extend mesh-rcnn from single view to multi-views which can obtain the initial mesh significantly superior to the state-of-the-art works (ellipsoid, single-view mesh-rcnn) (+10\%?+20\%?). 2. Introduce the contrastive feature extractor in GCNN which considers the reconstructed depth from MVS-Net and rendered depth from voxel grid, and further improve (+3.8\%) the quality of the mesh in the refinement module.}

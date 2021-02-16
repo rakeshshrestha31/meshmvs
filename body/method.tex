@@ -1,6 +1,8 @@
 \section{Methodology}
+\siyu{The current content of the ``Methodology'' section is too limited, try to expand this content.}
 
 \figref{system_architecture} shows the architecture of the proposed system which takes as input multi-view color images of an object with known poses and outputs a triangle mesh representing the surface of the object.
+\siyu{Before Section 3.1, at least two point should be mentioned: 1. The input and output of this approach, including some notations. 2. An overview of the whole methodology including some reference of the explicit sections. And it is also a hierarchical structure of the ``Methodology'' section.}
 
 \subsection{Multi-view Voxel Grid Prediction}
 \label{subsec:multiview_voxel}
@@ -8,8 +10,11 @@
 \paragraph{Single-view Voxel Grid Prediction}
 The single-view voxel branch consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network. It generates the coarse initial shape of an object from one viewpoint as voxel occupancy grid using a color image. Here, we set the resolution of the generated voxel occupancy grid as 32 $\times$ 32 $\times$ 32. The voxel prediction networks for all viewpoints share the same weights.
 % following Mesh R-CNN~\cite{gkioxari2019meshrcnn}.
-\vspace{-4mm}
+\siyu{Should cite MeshRCNN reference here. As well, the implementation differences should be detailized here.}
+
 \paragraph{Probabilistic Occupancy Grid Merging}
+\siyu{Present a figure to demonstrate the ``probabilistic occupancy grid merging'', the intermediate results of this module.}
+\siyu{This method is inspired by the traditional occupancy grid merging approaches in robotics? If so, try to cite the references and tell the differences between yours and the existed ones.}
 Voxel occupancy grid predicted from a single viewpoint suffers from occlusion and limited visibility. In order to fuse voxel grids from different viewpoints, we propose a probabilistic occupancy grid merging method which merges the voxel grids from each input viewpoint probabilistically to obtain the final voxel grid output. This allows occluded regions in one view to be estimated from other views where those regions are visible as well as increase the confidence of prediction in overlapping regions.
 Occupancy probability of each voxel is represented by $p(x)$ which is converted to log-odds (logit):
 % \footnote{In practice the \emph{voxel branch} directly predicts the log-odds instead of probabilities}
@@ -30,18 +35,23 @@ Bayesian update on the probabilities reduce to simple summation of log likelihoo
 The final voxel probability $x$ is obtained by applying the inverse function of \equref{logodds} which is a sigmoid function.
 % The final probability of the voxel $x$ can be obtained by applying the inverse function of \equref{logodds} which is a sigmoid function.
 
+\siyu{We should add an experiment and study the effect of the quality of the initial mesh on the final mesh reconstruction results, including the ellipsoid, single-view MeshRCNN, our MeshRCNN with different number of views.}
+
 \subsection{Mesh Refinement}
+\siyu{Present a figure to explain the detailed mechanism of the mesh refinement module.}
 The \texttt{cubified} mesh from the voxel branch only provides a coarse reconstruction of the object's surface. We apply graph convolutional networks which represent each mesh vertex as one graph node and deforms them to more accurate positions.
-\vspace{-4mm}
+
 \paragraph{GCN-based Mesh Deformation}
+\siyu{The intuition and basic operations of graph-cnn-based mesh deformation should be given first. Then, how does the previous approach obtain the features. Any limitations and problems of the previous approaches?}
 The features pooled from multi-view images along with 3D coordinates of the vertices in world frame are used as features of the graph nodes.
 Series of Graph-based Convolutional Network (GCN) blocks are applied to deform a mesh at the current stage to the next stage, starting with the \texttt{cubified} voxel grids.
 A graph convolution deforms mesh vertices by propagating features from neighboring vertices by applying
 $f_{i}^{'} = ReLU(W_0f_i + \sum_{j \in \mathcal{N}(i)} W_1 f_j)$ where $\mathcal{N}(i)$ is the set of neighboring vertices of the \emph{i}-th vertex in the mesh, $f_{\{\}}$ represents the feature vector of a vertex, and $W_0$ and $W_1$ are learnable parameters of the model.
 Each GCN block utilizes several graph convolutions to transform the vertex features along with a final \emph{vertex refinement} operation where the features along with vertex coordinates are further transformed as $v_i^{'} = v_i + tanh(W_{vert}[f_i;v_i])$ where the matrix $W_{vert}$ is another learnable parameter to obtain the deformed mesh.
-\vspace{-4mm}
+
 \label{subsec:contrastive_depth_feature_extraction}
 \paragraph{Contrastive Depth Feature Extraction}
+\siyu{Can you give a figure demonstrating the module of contrastive depth feature extraction? Since in Figure 1 of the ICLR submitted paper, you also input the RGBD feature maps from ResNet, do you still use it?}
 \cite{yao2020front2back} demonstrate that using intermediate, image-centric 2.5D representations instead of directly generating 3D shapes in global frame from raw 2D images can improve 3D reconstruction quality.
 We therefore propose to formulate the features for graph nodes using 2.5D depth maps as input additional inputs alongside the RGB features.
 % and \zhiwen{todo} to contrast the depth map at current refinement stage against the predicted depths.
@@ -52,17 +62,19 @@ Specifically, we render the meshes at different GCN stages to depth image at all
 Given the 2D features, corresponding feature vectors of individual vertices can be found by projecting the 3D vertex coordinates to the feature planes using known camera parameters.
 We use VGG-16~\cite{simonyan2014vgg} as our contrastive depth feature extraction network.
 % Along with the contrastive depth features, we also use the RGB features from ResNet calculated for voxel branch as input for mesh deformation as well.
-\vspace{-4mm}
+
 % and allows the network to reason about the deformation required better than when using predicted depths alone.
 % Multiple methods for augmenting the two depths were tried among which using concatenated rendered and predicted depth as input for depth feature extraction gave the best result.
 % Along with the contrastive depth features, we also use the RGB features from ResNet calculated for voxel branch as input for mesh deformation as well.
 
 \label{subsec:depth_prediction}
 \paragraph{Multi-View Depth Estimation}
+\siyu{In order to explain how can we obtain the initial depth images as the input, this paragraph should be put in front of the ``Mesh Refinement'' section, or the front of the ``3. Methodology''. We donot have to mention the details of MVS-Net, while some implementation details, like the view selection mechanism, resolution, network structure design, any difference from the standard MVS-Net or Cas-MVSNet.}
 We extend MVSNet~\cite{yao2018mvsnet} and predict the depth maps of all views since the original implementation predicts depth of only one reference view.
 This is achieved by transforming the feature volumes to each view's coordinate frame using homography warping
 and applying identical cost volume regularization and depth regression on each view.
 Detailed network architecture diagram of this module is provided in the appendix.
+\siyu{Do we have to add an experiment and compare the results give different settings of MVS-Net, such as the resolution of the depth images or we can add some noise to the depth. That is to study the effect of the quality of the depth on the final mesh reconstruction results and how sensitive is the refinement module to the depth quality.}
 
 % which constructs a regularized 3D cost volumes
 % to estimate the depth map of the reference view.
@@ -74,17 +86,14 @@ Detailed network architecture diagram of this module is provided in the appendix
 \begin{center}
 \includegraphics[width=\linewidth]{imgs/attention_weights_visualization.png}
 \end{center}
-\vspace{-4mm}
     \caption{
         \textbf{Attention weights visualization.}
         From left to right: input images from 3 viewpoints, corresponding ground truth point clouds color-coded by their view order and the predicted mesh vertices color-coded by the attention weights of the views.
         Only the view with maximum attention weight is visualized for each predicted points for clarity.
     }
-\vspace{-4mm}
 \label{fig:attention_weights}
 \end{figure*}
 
-\vspace{-4mm}
 \paragraph{Attention-based Multi-View Feature Pooling}
 In order to fuse multi-view contrastive depth features, we formulate an attention module by adapting multi-head attention mechanism originally designed for sequence to sequence machine translation using transformer (encoder-decoder) architecture~\cite{vaswani2017attention}.
 % \rakesh{Transformer architecture was proposed in multi-head attention paper, it doesn't need a separate citation}
@@ -112,7 +121,6 @@ $h$ is the number of attention heads and $i\in[1,h]$.
 We choose multi-head attention as our feature pooling method since it allows the model to attend information from different representation subspaces of the features by training multiple attentions in parallel.
 This method is also invariant to the order and number of input views.
 We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
-\vspace{-2mm}
 % instead of other forms of attention (e.g.~\cite{chorowski2015attention,luong2015effective}) because
 
 
@@ -149,25 +157,27 @@ for visually appealing results.
 % We do not observe such improvements (the performance is even worse).
 % Note that~\cite{wen2019pixel2mesh++} uses mesh generated by Pixel2Mesh~\cite{wang2018pixel2mesh} as input and further refines it while our predictions are obtained without such initialization which might explain this difference.
 % Nonetheless, for evaluation we use re-sampled Chamfer distance for a fair comparison.
-\vspace{-4mm}
+
 \paragraph{Depth loss}
 Our depth prediction network is supervised using adaptive reversed Huber loss (also known as BerHu criterion)~\cite{lambert2016adaptiveberhu}.
 % This loss has been used for depth prediction in previous work such as~\cite{tang2018ba,laina2016deeper}.
 $\mathcal{L}_{depth} = |x|, & \text{if}\ |x| \le c \text{, otherwise } \frac{x^2 + c^2}{2c}$ where $x$ is the depth error of a pixel and $c$ is a constant set to $0.2$.
 Note that the original MVSNet uses L1-loss, but we used BerHu loss since it gave slightly higher accuracy.
 Intuitively, this is because BerHu provides a good balance between L1 and L2 loss and has shown similar improvement in~\cite{laina2016deeper}.
-\vspace{-4mm}
+
 \paragraph{Contrastive depth loss}
 % Additional loss terms for mesh generation supervision can be derived from the available depth predictions at different views to add extra constraints on the generated mesh, providing a form of self-supervision.
 % The meshes predicted by different GCN blocks are differentiably rendered from the viewpoints of the predicted depth images and
 BerHu loss is also applied between the rendered depth images at different GCN stages and the predicted depth images.
 % which encourages the predicted mesh to conform to the predicted depths.
 $\mathcal{L}_{contrastive} = |x|, & \text{if}\ |x| \le c \text{, otherwise } \frac{x^2 + c^2}{2c}$
-\vspace{-4mm}
+
 \paragraph{Voxel loss} Binary cross-entropy loss between the predicted voxel occupancy probabilities and the ground truth occupancies is used as voxel loss to supervise the voxel predictions
 % Voxel loss is introduced for the final probabilistically merged voxel grid as well as the voxel grids of individual views.
 $\mathcal{L}_{\text{voxel}} = -{\Big(p(x) log\big(p(x)\big) + \big(1 - p(x)\big)log\big(1 - p(x)\big)\Big)}$
-\vspace{-4mm}
+
 \paragraph{Final loss} We use the weighted sum of the individual losses discussed above as the final loss to train our model in an end-to-end fashion.
 $\mathcal{L} = \lambda_{\text{chamfer}}\mathcal{L}_{\text{chamfer}} + \lambda_{\text{normal}}\mathcal{L}_{\text{normal}} + \lambda_{\text{edge}}\mathcal{L}_{\text{edge}} + \lambda_{\text{depth}}\mathcal{L}_{\text{depth}} + \lambda_{\text{contrastive}}\mathcal{L}_{\text{contrastive}} + \lambda_{\text{voxel}}\mathcal{L}_{\text{voxel}}$
 , where $\mathcal{L}$ is the final loss term.
+
+\siyu{We should discuss each loss function in more details. In addition, the description of $\mathcal{L}_{\text{chamfer}}$, $\mathcal{L}_{\text{normal}}$ and $\mathcal{L}_{\text{edge}}$ should be discussed in more details, including the intuition and functionality.}
