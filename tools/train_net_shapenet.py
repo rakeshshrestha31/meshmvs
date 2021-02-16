@@ -403,6 +403,11 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         str_out += ", mesh size = (%d, %d)" % (mean_V, mean_F)
                     logger.info(str_out)
 
+            # clean cuda cache to save memory
+            if torch.cuda.is_available() and cp.t % 50 == 0:
+                logger.info("clearing cuda cache")
+                torch.cuda.empty_cache()
+
             if loss_moving_average is None and loss is not None:
                 loss_moving_average = loss.item()
 
