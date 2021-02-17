@@ -4,6 +4,7 @@
 *.out
 *.synctex.gz
 *.dvi
+*.brf
 
 # bibtex temp files
 *.bbl
