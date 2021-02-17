@@ -77,6 +77,8 @@ def evaluate_test(model, data_loader, vis_preds=False):
                 model_kwargs["extrinsics"] = batch["extrinsics"]
             if isinstance(module, VoxMeshDepthHead):
                 model_kwargs["masks"] = batch["masks"]
+                if module.cfg.MODEL.USE_GT_DEPTH or module.mvsnet is None:
+                    model_kwargs["depths"] = batch["depths"]
 
             model_outputs = model(batch["imgs"], **model_kwargs)
             voxel_scores = model_outputs["voxel_scores"]
@@ -178,6 +180,8 @@ def evaluate_test_p2m(model, data_loader):
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if isinstance(module, VoxMeshDepthHead):
             model_kwargs["masks"] = batch["masks"]
+            if module.cfg.MODEL.USE_GT_DEPTH or module.mvsnet is None:
+                model_kwargs["depths"] = batch["depths"]
 
         model_outputs = model(batch["imgs"], **model_kwargs)
         meshes_pred = model_outputs.get("meshes_pred", [])
@@ -264,7 +268,7 @@ def evaluate_split(
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if isinstance(module, VoxMeshDepthHead):
             model_kwargs["masks"] = batch["masks"]
-            if module.cfg.MODEL.USE_GT_DEPTH:
+            if module.cfg.MODEL.USE_GT_DEPTH or module.cfg.MODEL.USE_GT_DEPTH:
                 model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
         meshes_pred = model_outputs.get("meshes_pred", [])
@@ -351,7 +355,7 @@ def evaluate_vox(model, loader, prediction_dir=None, max_predictions=-1):
             model_kwargs["extrinsics"] = batch["extrinsics"]
         if isinstance(module, VoxDepthHead):
             model_kwargs["masks"] = batch["masks"]
-            if module.cfg.MODEL.USE_GT_DEPTH:
+            if module.cfg.MODEL.USE_GT_DEPTH or module.mvsnet is None:
                 model_kwargs["depths"] = batch["depths"]
         model_outputs = model(batch["imgs"], **model_kwargs)
         voxel_scores = model_outputs["voxel_scores"]
