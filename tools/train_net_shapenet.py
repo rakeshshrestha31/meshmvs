@@ -463,7 +463,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
         test_loader = build_data_loader(
             cfg, get_dataset_name(cfg), "test", multigpu=False
         )
-        evaluate_test(model, test_loader)
+        evaluate_test_p2m(model, test_loader)
 
 
 def eval_and_save(
@@ -530,7 +530,8 @@ def save_predictions(
     for i in range(3):
         os.makedirs(os.path.join(output_dir, str(i)), exist_ok=True)
 
-    for loader_idx, batch in enumerate(tqdm.tqdm(loader)):
+    # for loader_idx, batch in enumerate(tqdm.tqdm(loader)):
+    for loader_idx, batch in enumerate(loader):
         batch = loader.postprocess(batch, device)
 
         model_kwargs = {}
