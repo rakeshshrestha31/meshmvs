@@ -298,12 +298,10 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 )
 
             # debug only
-            if len(meshes_pred) > 0:
-                mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
-                mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
-            logger.info("mesh size = (%r)" % (list(zip(mean_V, mean_F))))
-
-            loss, losses = None, {}
+            # if len(meshes_pred) > 0:
+            #     mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
+            #     mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
+            # logger.info("mesh size = (%r)" % (list(zip(mean_V, mean_F))))
 
             num_infinite = 0
             for cur_meshes in meshes_pred:
@@ -403,11 +401,6 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                         str_out += ", mesh size = (%d, %d)" % (mean_V, mean_F)
                     logger.info(str_out)
 
-            # clean cuda cache to save memory
-            if torch.cuda.is_available() and cp.t % 50 == 0:
-                logger.info("clearing cuda cache")
-                torch.cuda.empty_cache()
-
             if loss_moving_average is None and loss is not None:
                 loss_moving_average = loss.item()
 
@@ -451,6 +444,14 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 msg = "WARNING: Got %d non-finite elements in gradient; skipping update"
                 logger.info(msg % num_infinite_grad)
             cp.step()
+
+            # clean cuda cache to save memory
+            model_outputs.clear()
+            losses.clear()
+            del model_outputs, loss, losses
+            if torch.cuda.is_available() and cp.t % 2 == 0:
+                # logger.info("clearing cuda cache")
+                torch.cuda.empty_cache()
 
         cp.step_epoch()
         eval_and_save(
