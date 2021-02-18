@@ -9,6 +9,7 @@ import time
 import numpy as np
 import tqdm
 import json
+import gc
 
 import detectron2.utils.comm as comm
 import torch
@@ -426,30 +427,51 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             # Backprop and step
             scheduler.step()
             optimizer.zero_grad()
-            with Timer("Backward"):
-                loss.backward()
 
-            # When training with normal loss, sometimes I get NaNs in gradient that
-            # cause the model to explode. Check for this before performing a gradient
-            # update. This is safe in mult-GPU since gradients have already been
-            # summed, so each GPU has the same gradients.
-            num_infinite_grad = 0
-            for p in params:
-                if p.grad is not None:
-                    num_infinite_grad += (torch.isfinite(p.grad) == 0).sum() \
-                                                                      .item()
-            if num_infinite_grad == 0:
-                optimizer.step()
-            else:
-                msg = "WARNING: Got %d non-finite elements in gradient; skipping update"
-                logger.info(msg % num_infinite_grad)
+            is_backward_successful = False
+            with Timer("Backward"):
+                try:
+                    loss.backward()
+                    is_backward_successful = True
+                except RuntimeError as e:
+                    is_backward_successful = False
+                    logger.info("Runtime Error {}".format(e))
+                    mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
+                    mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
+                    logger.info("mesh size = (%r)" % (list(zip(mean_V, mean_F))))
+
+                    # clean cuda cache to save memory
+                    model_outputs.clear()
+                    losses.clear()
+                    del model_outputs, loss, losses
+                    gc.collect()
+                    torch.cuda.empty_cache()
+
+            if is_backward_successful:
+                # When training with normal loss, sometimes I get NaNs in gradient that
+                # cause the model to explode. Check for this before performing a gradient
+                # update. This is safe in mult-GPU since gradients have already been
+                # summed, so each GPU has the same gradients.
+                num_infinite_grad = 0
+                for p in params:
+                    if p.grad is not None:
+                        num_infinite_grad += (torch.isfinite(p.grad) == 0).sum() \
+                                                                          .item()
+                if num_infinite_grad == 0:
+                    optimizer.step()
+                else:
+                    msg = "WARNING: Got %d non-finite elements in gradient; skipping update"
+                    logger.info(msg % num_infinite_grad)
+
             cp.step()
 
             # clean cuda cache to save memory
             model_outputs.clear()
             losses.clear()
             del model_outputs, loss, losses
-            if torch.cuda.is_available() and cp.t % 2 == 0:
+            gc.collect()
+            if is_backward_successful and \
+                    torch.cuda.is_available() and cp.t % 2 == 0:
                 # logger.info("clearing cuda cache")
                 torch.cuda.empty_cache()
 
