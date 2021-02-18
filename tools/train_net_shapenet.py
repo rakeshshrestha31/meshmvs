@@ -466,12 +466,12 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             cp.step()
 
             # clean cuda cache to save memory
-            model_outputs.clear()
-            losses.clear()
-            del model_outputs, loss, losses
-            gc.collect()
             if is_backward_successful and \
                     torch.cuda.is_available() and cp.t % 2 == 0:
+                model_outputs.clear()
+                losses.clear()
+                del model_outputs, loss, losses
+                gc.collect()
                 # logger.info("clearing cuda cache")
                 torch.cuda.empty_cache()
 
