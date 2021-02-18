@@ -10,6 +10,7 @@ import numpy as np
 import tqdm
 import json
 import gc
+import traceback
 
 import detectron2.utils.comm as comm
 import torch
@@ -291,7 +292,15 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     model_kwargs["depths"] = batch["depths"]
 
             with Timer("Forward"):
-                model_outputs = model(batch["imgs"], **model_kwargs)
+                try:
+                    model_outputs = model(batch["imgs"], **model_kwargs)
+                except RuntimeError as e:
+                    logger.info("Runtime Error {}".format(e))
+                    traceback.print_exc()
+                    torch.cuda.empty_cache()
+                    cp.step()
+                    continue
+
                 voxel_scores = model_outputs.get("voxel_scores", None)
                 meshes_pred = model_outputs.get("meshes_pred", [])
                 merged_voxel_scores = model_outputs.get(
@@ -436,6 +445,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 except RuntimeError as e:
                     is_backward_successful = False
                     logger.info("Runtime Error {}".format(e))
+                    traceback.print_exc()
                     mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
                     mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
                     logger.info("mesh size = (%r)" % (list(zip(mean_V, mean_F))))
