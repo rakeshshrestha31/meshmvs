@@ -82,6 +82,7 @@ class VoxMeshHead(nn.Module):
             )
             return {
                 "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
+                "init_meshes": dummy_meshes,
             }
 
         cubified_meshes = cubify(
@@ -92,6 +93,8 @@ class VoxMeshHead(nn.Module):
         )
         return {
             "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
+            "init_meshes": cubified_meshes,
+
         }
 
 
@@ -295,7 +298,8 @@ class VoxMeshMultiViewHead(VoxMeshHead):
                 "voxel_scores": voxel_scores, "meshes_pred": dummy_refined,
                 "merged_voxel_scores": merged_voxel_scores,
                 "transformed_voxel_scores": transformed_voxel_scores,
-                "view_weights": view_weights
+                "view_weights": view_weights,
+                "init_meshes": dummy_meshes,
             }
 
         cubified_meshes = cubify(
@@ -308,7 +312,8 @@ class VoxMeshMultiViewHead(VoxMeshHead):
             "voxel_scores": voxel_scores, "meshes_pred": refined_meshes,
             "merged_voxel_scores": merged_voxel_scores,
             "transformed_voxel_scores": transformed_voxel_scores,
-            "view_weights": view_weights
+            "view_weights": view_weights,
+            "init_meshes": cubified_meshes,
         }
 
 
@@ -1325,6 +1330,7 @@ class SphereInitHead(nn.Module):
         refined_meshes = self.mesh_head(img_feats, init_meshes, P)
         return {
             "voxel_scores":None, "meshes_pred": refined_meshes,
+            "init_meshes": init_meshes,
         }
 
 
@@ -1363,6 +1369,7 @@ class Pixel2MeshHead(nn.Module):
         refined_meshes = self.mesh_head(img_feats, init_meshes, P, subdivide=True)
         return {
             "voxel_scores":None, "meshes_pred": refined_meshes,
+            "init_meshes": init_meshes,
         }
 
 
