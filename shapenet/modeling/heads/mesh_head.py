@@ -186,14 +186,39 @@ def multiview_vert_align(img_feats, vert_pos_padded, feat_fusion_callback=None):
     assert(torch.all(torch.tensor([
         feat.shape[1] == vert_pos_padded.shape[1] for feat in img_feats
     ])))
-    vert_aligned_feats = []
-    for view_idx, view_verts in enumerate(vert_pos_padded.unbind(1)):
-        view_feats = [feat[:, view_idx] for feat in img_feats]
-        vert_aligned_feats.append(vert_align(view_feats, view_verts))
 
-    if len(vert_aligned_feats) == 1:
+    B, V, N = vert_pos_padded.shape[:3]
+
+    # flatten batch and view dimension to avoid looping over all views
+    # list of (B*V, C, H, W)
+    img_feats_flattened = [
+        feat.view(B*V, *feat.shape[-3:]) for feat in img_feats
+    ]
+    vert_pos_padded_flattened = vert_pos_padded.view(B*V, N, 3)
+    # (B*V, N, sum(C))
+    vert_aligned_feats = vert_align(
+        img_feats_flattened, vert_pos_padded_flattened
+    )
+
+    # unflatten(B, V, N, sum(C))
+    vert_aligned_feats = vert_aligned_feats.view(
+        B, V, *vert_aligned_feats.shape[-2:]
+    )
+    vert_aligned_feats_new = vert_aligned_feats
+
+    # # old way (looping over views)
+    # vert_aligned_feats_old = []
+    # for view_idx, view_verts in enumerate(vert_pos_padded.unbind(1)):
+    #     view_feats = [feat[:, view_idx] for feat in img_feats]
+    #     vert_aligned_feats_old.append(vert_align(view_feats, view_verts))
+
+    # vert_aligned_feats_old = torch.stack(vert_aligned_feats_old, dim=1)
+    # # always gives zero, so new method is correct :)
+    # print(torch.sum(torch.abs(vert_aligned_feats_old - vert_aligned_feats)))
+
+    if vert_pos_padded.shape[1] == 1:
         # single view, just return the features
-        return vert_aligned_feats[0], None
+        return vert_aligned_feats[:, 0], None
     else:
         if feat_fusion_callback is None:
             raise ValueError("feat_fusion_callback None with multi-view features")

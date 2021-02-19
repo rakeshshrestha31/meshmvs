@@ -202,13 +202,19 @@ class VoxMeshMultiViewHead(VoxMeshHead):
     def fuse_multiview_features(self, features):
         """
         Args:
-        - features: list of tensors of shape (B, N, C_in). List len = num_views
+        - features:
+            Either list of tensors of shape (B, N, C_in). List len = num_views (V)
+            Or tensor of shape (B, V, N, C_in)
         Returns:
         - fused feature: tensor of shape (B, N, C_out)
         - weights: tensor of shape (B, N, V, 1)
         """
         # shape (B, V, N, C_in)
-        joint_features = torch.stack(features, dim=1)
+        if torch.is_tensor(features):
+            joint_features = features
+        else:
+            joint_features = torch.stack(features, dim=1)
+
         fused_features = []
         fusion_weights = []
         # each batch needs to be treated separately
