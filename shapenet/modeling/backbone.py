@@ -210,33 +210,33 @@ class VGG16P2M(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, img):
-        img = F.relu(self.conv0_1(img))
-        img = F.relu(self.conv0_2(img))
+        img = F.relu_(self.conv0_1(img))
+        img = F.relu_(self.conv0_2(img))
         # img0 = torch.squeeze(img) # 224
 
-        img = F.relu(self.conv1_1(img))
-        img = F.relu(self.conv1_2(img))
-        img = F.relu(self.conv1_3(img))
+        img = F.relu_(self.conv1_1(img))
+        img = F.relu_(self.conv1_2(img))
+        img = F.relu_(self.conv1_3(img))
         # img1 = torch.squeeze(img) # 112
 
-        img = F.relu(self.conv2_1(img))
-        img = F.relu(self.conv2_2(img))
-        img = F.relu(self.conv2_3(img))
+        img = F.relu_(self.conv2_1(img))
+        img = F.relu_(self.conv2_2(img))
+        img = F.relu_(self.conv2_3(img))
         img2 = img
 
-        img = F.relu(self.conv3_1(img))
-        img = F.relu(self.conv3_2(img))
-        img = F.relu(self.conv3_3(img))
+        img = F.relu_(self.conv3_1(img))
+        img = F.relu_(self.conv3_2(img))
+        img = F.relu_(self.conv3_3(img))
         img3 = img
 
-        img = F.relu(self.conv4_1(img))
-        img = F.relu(self.conv4_2(img))
-        img = F.relu(self.conv4_3(img))
+        img = F.relu_(self.conv4_1(img))
+        img = F.relu_(self.conv4_2(img))
+        img = F.relu_(self.conv4_3(img))
         img4 = img
 
-        img = F.relu(self.conv5_1(img))
-        img = F.relu(self.conv5_2(img))
-        img = F.relu(self.conv5_3(img))
+        img = F.relu_(self.conv5_1(img))
+        img = F.relu_(self.conv5_2(img))
+        img = F.relu_(self.conv5_3(img))
         img = F.relu(self.conv5_4(img))
         img5 = img
 

@@ -31,7 +31,7 @@ class VoxelHead(nn.Module):
                 padding=1,
                 bias=not self.norm,
                 norm=get_norm(self.norm, conv_dims),
-                activation=F.relu,
+                activation=F.relu_,
             )
             self.add_module("voxel_fcn{}".format(k + 1), conv)
             self.conv_norm_relus.append(conv)
@@ -59,6 +59,6 @@ class VoxelHead(nn.Module):
         x = F.interpolate(x, size=V // 2, mode="bilinear", align_corners=False)
         for layer in self.conv_norm_relus:
             x = layer(x)
-        x = F.relu(self.deconv(x))
+        x = F.relu_(self.deconv(x))
         x = self.predictor(x)
         return x
