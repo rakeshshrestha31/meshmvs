@@ -35,8 +35,8 @@ def add_dummy_meshes(meshes):
     faces_list = meshes.faces_list()
     for i in range(N):
         if faces_list[i].shape[0] == 0:
-            # print('Adding dummmy mesh at index ', i)
-            vv, ff = dummies.get_mesh(i)
+            print('Adding dummmy mesh at index ', i)
+            vv, ff = dummies.get_mesh_verts_faces(i)
             verts_list[i] = vv
             faces_list[i] = ff
     return Meshes(verts=verts_list, faces=faces_list)
