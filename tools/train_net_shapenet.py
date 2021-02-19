@@ -268,15 +268,30 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 iteration_timer.start()
             else:
                 iteration_timer.tick()
-            batch = loaders["train"].postprocess(batch, device)
 
-            num_infinite_params = 0
-            for p in params:
-                num_infinite_params += (torch.isfinite(p.data) == 0).sum().item()
-            if num_infinite_params > 0:
-                msg = "ERROR: Model has %d non-finite params (before forward!)"
-                logger.info(msg % num_infinite_params)
-                return
+            try:
+                batch = loaders["train"].postprocess(batch, device)
+
+                num_infinite_params = 0
+                for p in params:
+                    num_infinite_params += (torch.isfinite(p.data) == 0).sum().item()
+                if num_infinite_params > 0:
+                    msg = "ERROR: Model has %d non-finite params (before forward!)"
+                    logger.info(msg % num_infinite_params)
+                    return
+            except RuntimeError as e:
+                logger.info("Caught Runtime Error {}".format(e))
+                traceback.print_exc()
+                if "batch" in locals():
+                    batch.clear()
+                    del batch
+                if "num_infinite_params" in locals():
+                    del num_infinite_params
+                gc.collect()
+                torch.cuda.empty_cache()
+                cp.step()
+                continue
+
 
             model_kwargs = {}
             if cfg.MODEL.VOXEL_ON and cp.t < cfg.MODEL.VOXEL_HEAD.VOXEL_ONLY_ITERS:
