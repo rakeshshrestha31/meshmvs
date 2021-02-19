@@ -269,29 +269,15 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             else:
                 iteration_timer.tick()
 
-            try:
-                batch = loaders["train"].postprocess(batch, device)
+            batch = loaders["train"].postprocess(batch, device)
 
-                num_infinite_params = 0
-                for p in params:
-                    num_infinite_params += (torch.isfinite(p.data) == 0).sum().item()
-                if num_infinite_params > 0:
-                    msg = "ERROR: Model has %d non-finite params (before forward!)"
-                    logger.info(msg % num_infinite_params)
-                    return
-            except RuntimeError as e:
-                logger.info("Caught Runtime Error {}".format(e))
-                traceback.print_exc()
-                if "batch" in locals():
-                    batch.clear()
-                    del batch
-                if "num_infinite_params" in locals():
-                    del num_infinite_params
-                gc.collect()
-                torch.cuda.empty_cache()
-                cp.step()
-                continue
-
+            num_infinite_params = 0
+            for p in params:
+                num_infinite_params += (torch.isfinite(p.data) == 0).sum().item()
+            if num_infinite_params > 0:
+                msg = "ERROR: Model has %d non-finite params (before forward!)"
+                logger.info(msg % num_infinite_params)
+                return
 
             model_kwargs = {}
             if cfg.MODEL.VOXEL_ON and cp.t < cfg.MODEL.VOXEL_HEAD.VOXEL_ONLY_ITERS:
@@ -307,19 +293,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     model_kwargs["depths"] = batch["depths"]
 
             with Timer("Forward"):
-                try:
-                    model_outputs = model(batch["imgs"], **model_kwargs)
-                except RuntimeError as e:
-                    logger.info("Caught Runtime Error {}".format(e))
-                    traceback.print_exc()
-                    if "model_outputs" in locals():
-                        model_outputs.clear()
-                        del model_outputs
-                    gc.collect()
-                    torch.cuda.empty_cache()
-                    cp.step()
-                    continue
-
+                model_outputs = model(batch["imgs"], **model_kwargs)
                 voxel_scores = model_outputs.get("voxel_scores", None)
                 meshes_pred = model_outputs.get("meshes_pred", [])
                 merged_voxel_scores = model_outputs.get(
@@ -456,53 +430,36 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
             scheduler.step()
             optimizer.zero_grad()
 
-            is_backward_successful = False
             with Timer("Backward"):
-                try:
-                    loss.backward()
-                    is_backward_successful = True
-                except RuntimeError as e:
-                    is_backward_successful = False
-                    logger.info("Caught Runtime Error {}".format(e))
-                    traceback.print_exc()
-                    mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
-                    mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
-                    logger.info("mesh size = (%r)" % (list(zip(mean_V, mean_F))))
+                loss.backward()
 
-                    # clean cuda cache to save memory
-                    model_outputs.clear()
-                    losses.clear()
-                    del model_outputs, loss, losses
-                    gc.collect()
-                    torch.cuda.empty_cache()
-
-            if is_backward_successful:
-                # When training with normal loss, sometimes I get NaNs in gradient that
-                # cause the model to explode. Check for this before performing a gradient
-                # update. This is safe in mult-GPU since gradients have already been
-                # summed, so each GPU has the same gradients.
-                num_infinite_grad = 0
-                for p in params:
-                    if p.grad is not None:
-                        num_infinite_grad += (torch.isfinite(p.grad) == 0).sum() \
-                                                                          .item()
-                if num_infinite_grad == 0:
-                    optimizer.step()
-                else:
-                    msg = "WARNING: Got %d non-finite elements in gradient; skipping update"
-                    logger.info(msg % num_infinite_grad)
+            # When training with normal loss, sometimes I get NaNs in gradient that
+            # cause the model to explode. Check for this before performing a gradient
+            # update. This is safe in mult-GPU since gradients have already been
+            # summed, so each GPU has the same gradients.
+            num_infinite_grad = 0
+            for p in params:
+                if p.grad is not None:
+                    num_infinite_grad += (torch.isfinite(p.grad) == 0).sum() \
+                                                                      .item()
+            if num_infinite_grad == 0:
+                optimizer.step()
+            else:
+                msg = "WARNING: Got %d non-finite elements in gradient; skipping update"
+                logger.info(msg % num_infinite_grad)
+            del num_infinite_grad
 
             cp.step()
 
             # clean cuda cache to save memory
-            if is_backward_successful and \
-                    torch.cuda.is_available() and cp.t % 2 == 0:
+            if torch.cuda.is_available() and cp.t % 2 == 0:
                 model_outputs.clear()
                 losses.clear()
                 del model_outputs, loss, losses
                 gc.collect()
                 # logger.info("clearing cuda cache")
-                torch.cuda.empty_cache()
+                with torch.cuda.device(device):
+                    torch.cuda.empty_cache()
 
         cp.step_epoch()
         eval_and_save(
