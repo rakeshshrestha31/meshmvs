@@ -35,6 +35,7 @@ class VoxMeshHead(nn.Module):
         super(VoxMeshHead, self).__init__()
 
         self.setup(cfg)
+        self.cfg = cfg
         # backbone
         self.backbone, feat_dims = build_backbone(cfg.MODEL.VOXEL_HEAD.RGB_BACKBONE)
         # voxel head
@@ -100,6 +101,7 @@ class VoxMeshMultiViewHead(VoxMeshHead):
         nn.Module.__init__(self)
 
         self.setup(cfg)
+        self.cfg = cfg
         self.single_view_voxel_prediction = cfg.MODEL.VOXEL_HEAD.SINGLE_VIEW
 
         # backbone
@@ -1293,6 +1295,7 @@ class SphereInitHead(nn.Module):
     def __init__(self, cfg):
         super(SphereInitHead, self).__init__()
 
+        self.cfg = cfg
         # fmt: off
         backbone                = cfg.MODEL.MESH_HEAD.RGB_BACKBONE
         self.ico_sphere_level   = cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL
@@ -1330,6 +1333,7 @@ class Pixel2MeshHead(nn.Module):
     def __init__(self, cfg):
         super(Pixel2MeshHead, self).__init__()
 
+        self.cfg = cfg
         # fmt: off
         backbone                = cfg.MODEL.MESH_HEAD.RGB_BACKBONE
         self.ico_sphere_level   = cfg.MODEL.MESH_HEAD.ICO_SPHERE_LEVEL
