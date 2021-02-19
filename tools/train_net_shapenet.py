@@ -295,8 +295,12 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                 try:
                     model_outputs = model(batch["imgs"], **model_kwargs)
                 except RuntimeError as e:
-                    logger.info("Runtime Error {}".format(e))
+                    logger.info("Caught Runtime Error {}".format(e))
                     traceback.print_exc()
+                    if "model_outputs" in locals():
+                        model_outputs.clear()
+                        del model_outputs
+                    gc.collect()
                     torch.cuda.empty_cache()
                     cp.step()
                     continue
@@ -444,7 +448,7 @@ def training_loop(cfg, cp, model, optimizer, scheduler, loaders, device, loss_fn
                     is_backward_successful = True
                 except RuntimeError as e:
                     is_backward_successful = False
-                    logger.info("Runtime Error {}".format(e))
+                    logger.info("Caught Runtime Error {}".format(e))
                     traceback.print_exc()
                     mean_V = meshes_pred[-1].num_verts_per_mesh().tolist()
                     mean_F = meshes_pred[-1].num_faces_per_mesh().tolist()
