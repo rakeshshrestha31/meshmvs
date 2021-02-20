@@ -1021,14 +1021,26 @@ class VoxMeshDepthHead(VoxDepthHead):
             cubified_meshes = cubify(
                 voxel_scores, self.voxel_size, threshold
             )
-            mean_V = cubified_meshes.num_verts_per_mesh().float().mean().item()
-            mean_F = cubified_meshes.num_faces_per_mesh().float().mean().item()
-            if mean_V > MAX_V or mean_F > MAX_F:
+            max_V = cubified_meshes.num_verts_per_mesh().float().max().item()
+            max_F = cubified_meshes.num_faces_per_mesh().float().max().item()
+            if max_V > MAX_V or max_F > MAX_F:
                 threshold = threshold * 1.2
                 print("mesh size ({}, {}) too large setting threshold to {}" \
-                        .format(mean_V, mean_F, threshold))
+                        .format(max_V, max_F, threshold))
             else:
                 break
+
+        max_V = cubified_meshes.num_verts_per_mesh().float().max().item()
+        max_F = cubified_meshes.num_faces_per_mesh().float().max().item()
+
+        if max_V > MAX_V or max_F > MAX_F:
+            print("mesh size ({}, {}) still too large, using dummy mesh" \
+                    .format(max_V, max_F))
+
+            batch_size = voxel_scores.shape[0]
+            device = voxel_scores.device
+            cubified_meshes = dummy_mesh(batch_size, device)
+
         return cubified_meshes
 
     def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
