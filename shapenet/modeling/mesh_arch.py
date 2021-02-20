@@ -1010,6 +1010,27 @@ class VoxMeshDepthHead(VoxDepthHead):
             "view_weights": view_weights
         }
 
+    def cubify(self, voxel_scores):
+        """
+        Cubifies a voxel grid. Adapts the cubify threshold to limit mesh size
+        """
+        threshold = self.cubify_threshold
+        MAX_V = 4500
+        MAX_F = 9000
+        while threshold < 0.9:
+            cubified_meshes = cubify(
+                voxel_scores, self.voxel_size, threshold
+            )
+            mean_V = cubified_meshes.num_verts_per_mesh().float().mean().item()
+            mean_F = cubified_meshes.num_faces_per_mesh().float().mean().item()
+            if mean_V > MAX_V or mean_F > MAX_F:
+                threshold = threshold * 1.2
+                print("mesh size ({}, {}) too large setting threshold to {}" \
+                        .format(mean_V, mean_F, threshold))
+            else:
+                break
+        return cubified_meshes
+
     def forward(self, imgs, intrinsics, extrinsics, masks, voxel_only=False, **kwargs):
         """
         Args:
@@ -1034,9 +1055,8 @@ class VoxMeshDepthHead(VoxDepthHead):
             )
             cubified_meshes = dummy_meshes
         else:
-            cubified_meshes = cubify(
-                voxel_head_output["merged_voxel_scores"],
-                self.voxel_size, self.cubify_threshold
+            cubified_meshes = self.cubify(
+                voxel_head_output["merged_voxel_scores"]
             )
             mesh_head_output = self.forward_mesh_head(
                 imgs, voxel_head_output["masked_pred_depths"],
