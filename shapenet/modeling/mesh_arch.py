@@ -1015,8 +1015,8 @@ class VoxMeshDepthHead(VoxDepthHead):
         Cubifies a voxel grid. Adapts the cubify threshold to limit mesh size
         """
         threshold = self.cubify_threshold
-        MAX_V = 4500
-        MAX_F = 9000
+        MAX_V = 4000
+        MAX_F = 8500
         while threshold < 0.9:
             cubified_meshes = cubify(
                 voxel_scores, self.voxel_size, threshold
