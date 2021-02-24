@@ -4,15 +4,16 @@ The ``Traditional Shape Generation Methods'' can be merged into ``single-view sh
 \rakesh{
     Depth estimation survey removed.
     Added paragraph for 3D Shape representation
+    Restructured the related work categories to single-view and multi-view methods
 }
 
 \paragraph{3D Shape Representation}
 3D occupancy grid has been a popular representation since conventional CNNs can be used to generate them~\cite{3dr2n2,kar2017lsm}.
-Point cloud representation for shape generation has been explored in~\cite{fan2017point,yang2018foldingnet,jia2020dv}.
 More recently, mesh representation is being increasingly used for 3D reconstruction~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} where a template mesh (an ellipsoid) is deformed to obtain the final shape.
 This approach struggles in reconstructing shapes whose topologies are very different from the template mesh.
 \cite{gkioxari2019meshrcnn} proposes a hybrid approach where a coarse occupancy grid is first predicted from single image which is converted to mesh representation and further refined using mesh deformations.
 We adopt a similar approach in our work where we predict the coarse occupancy grid from multi-view images which are used as the initial shape for succeeding refinements.
+Other shape representations include point clouds~\cite{fan2017point,yang2018foldingnet,jia2020dv}, implicit surfaces~\cite{park2019deepsdf}, depth images~\cite{yao2018mvsnet,yao2019recurrent} etc.
 
 
 \textcolor{Red}{
@@ -42,34 +43,38 @@ Mainly focus on the limitations of existed methods and how can we handle such li
 \label{fig:system_architecture}
 \end{figure*}
 
-\paragraph{Traditional Shape Generation Methods}
-3D model generation has traditionally been tackled using multi-view geometry principles.
-Among them, structure-from-motion (SfM)~\cite{schonberger2016structure,agarwal2011building,cui2015global,cui2017hsfm} and simultaneous localization and mapping (SLAM)~\cite{cadena2016pastslam,mur2015orb,engel2014lsd,whelan2015elasticfusion} are popular techniques that perform 3D reconstruction and camera pose estimation at the same time. These methods extract local image features, match them across images and use the matches to estimate camera poses and 3D geometry.
-% But these methods are limited to texture-rich objects with non-reflective surfaces
-% and optimal/exhaustive view selection is also essential for reconstructing a complete 3D model with high accuracy.
-Closer to our problem setup, multi-view stereo methods infer 3D geometry from images with known camera parameters.
-% These generally fall into one of two categories: Volumetric and Point Cloud based methods.
-Volumetric methods~\cite{kar2017lsm, kutulakos2000theory, seitz1999photorealistic} predict voxel grid representation of objects by estimating the relationship between each voxel and object surfaces.
-Point cloud based methods~\cite{furukawa2009accurate, lhuillier2005quasi} start with a sparse point cloud and
-gradually increase the density of points to obtain a final dense point cloud of the object.
-\cite{durou2008numerical,zhang1999shape,favaro2005geometric} reason about shading, texture and defocus to reason about visible parts of the object and infer its 3D geometry.
-While the results of these works are impressive in terms of quality and completeness of reconstruction, they still struggle with poorly textured and reflective surfaces and require carefully selected input views.
-
-\paragraph{Deep Shape Generation Methods}
- Deep learning based approaches can learn to infer 3D structure from training data and can be robust against poorly textured and reflective surfaces as well as limited and arbitrarily selected input views. These methods can be categorized into single view and multi-view methods.
-\cite{huang2015single, su2014estimating} use shape component retrieval and deformation from a large dataset for single-view 3D shape generation.
+\paragraph{Single-view Shape Generation.}
+Traditional single-view shape generation methods like~\cite{durou2008numerical,zhang1999shape,favaro2005geometric} reason about shading, texture and defocus to reason about visible parts of the object and infer its 3D geometry.
+Earlier learning-based approaches~\cite{huang2015single, su2014estimating} use shape component retrieval and deformation from a large dataset for single-view 3D shape generation.
 \cite{kurenkov2018deformnet} extend this idea by introducing free-form deformation networks on retrieved object templates from a database.
 Some work learn shape deformation from ground truth foreground masks of 2D images~\cite{kar2015category,yan2016perspective,tulsiani2017multi}.
-Recurrent Neural Networks (RNN) based methods~\cite{3dr2n2, kar2017lsm, mcrecon2017} are another popular solution to solve this problem.
-\cite{mcrecon2017, lin2019photometric} introduce image silhouettes along with adversarial multi-view constraints and optimize object mesh models using multi-view photometric constraints.
-Predicting mesh directly from color images was proposed in~\cite{wang2018pixel2mesh, wickramasinghe2019voxel2mesh,pan2019deep,wen2019pixel2mesh++, gkioxari2019meshrcnn, tang2019skeleton}.
-DR-KFS~\cite{jin2019drkfs} introduces a differentiable visual similarity metric
+\cite{3dr2n2,hane2017hierarchical,johnston2017scaling} can learning 3D volumetric representations through deep learning.
+Predicting 3D mesh from single-view color images has been proposed in~\cite{wang2018pixel2mesh,pan2019deep,gkioxari2019meshrcnn, tang2019skeleton}.
+DR-KFS~\cite{jin2019drkfs} introduces a differentiable visual similarity metric to learn single-view 3D shape generation
 while SeqXY2SeqZ~\cite{han2020seqxy2seqz} represents 3D shapes using a set of 2D voxel tubes for shape reconstruction.
 Front2Back~\cite{yao2020front2back} generates 3D shapes by fusing predicted depth and normal images and
 DV-Net~\cite{jia2020dv} predicts dense object point clouds using dual-view RGB images with a gated control network to fuse point clouds from the two views.
 FoldingNet~\cite{yang2018foldingnet} learns to reconstruct arbitrary point clouds from a single 2D grid.
 AtlasNet~\cite{groueix2018papier} use learned parametric representation
 while \cite{mescheder2019occupancy,park2019deepsdf,liu2019learning,liu2019dist,murez2020atlas} employ implicit surface representation to reconstruct 3D shapes.
+
+\paragraph{Multi-view Shape Generation.}
+Multi-view 3D model generation has traditionally been tackled using stereo geometry principles.
+Among them, structure-from-motion (SfM)~\cite{schonberger2016structure,agarwal2011building,cui2015global,cui2017hsfm} and simultaneous localization and mapping (SLAM)~\cite{cadena2016pastslam,mur2015orb,engel2014lsd,whelan2015elasticfusion} are popular techniques that perform 3D reconstruction and camera pose estimation at the same time.
+% Closer to our problem setup, multi-view stereo methods infer 3D geometry from images with known camera parameters.
+% These generally fall into one of two categories: Volumetric and Point Cloud based methods.
+Similarly, traditional multi-view stereo methods infer 3D geometry from images with known camera parameters either using
+volumetric representation~\cite{kutulakos2000theory, seitz1999photorealistic} or
+point cloud representation~\cite{furukawa2009accurate, lhuillier2005quasi}.
+These methods extract local image features, match them across images and use the matches to estimate 3D geometry.
+While the results of these works are impressive in terms of quality and completeness of reconstruction, they still struggle with poorly textured and reflective surfaces and require carefully selected input views.
+
+Deep learning based approaches can learn to infer 3D structure from training data and can be robust against poorly textured and reflective surfaces as well as limited and arbitrarily selected input views.
+\cite{hartmann2017learned_16,deepmvs2018,yao2018mvsnet,chen2019point,luo2019pmvsnet,gu2019cascade,yao2019recurrent} propose multi-view stereo models from learned cost volumes to predict depth images.
+Recurrent Neural Networks (RNN) based methods~\cite{3dr2n2, kar2017lsm, mcrecon2017} are another popular solution to solve this problem.
+\cite{mcrecon2017, lin2019photometric} introduce image silhouettes along with adversarial multi-view constraints and optimize object mesh models using multi-view photometric constraints.
+Pixel2Mesh++~\cite{wen2019pixel2mesh++} extends single-view Pixel2Mesh~\cite{wang2018pixel2mesh} to multi-view image input by introducing cross-view perceptual feature pooling and multi-view deformation reasoning but struggles to reconstruct complex shape topologies due to its use of ellipsoidal template shape which it deforms to the final shape.
+Our work avoids this pitfall by first predicting a coarse volumetric model which can represent complex topologies and then applying deformations on it to get a finer shape as the final model.
 
 % Pixel2Mesh~\cite{wang2018pixel2mesh} utilizes a single image of an object to predict its triangle mesh using perceptual features extracted from the image as GCN input.
 % Voxel2Mesh~\cite{wickramasinghe2019voxel2mesh} extends Pixel2Mesh by using 3D volumes as input instead of 2D images.
