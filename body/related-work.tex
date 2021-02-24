@@ -1,14 +1,26 @@
 \section{Related Work}
 \siyu{I think the classification of related works in Pixel2Mesh++ is more reasonable, that is 3D shape representation, single-view shape generation, and multi-view shape generation.
 The ``Traditional Shape Generation Methods'' can be merged into ``single-view shape generation'' and ``multi-view shape generation''. We donot have to survey ``Depth Estimation'', which seems irrelevant to our approach.}
+\rakesh{
+    Depth estimation survey removed.
+    Added paragraph for 3D Shape representation
+}
+
+\paragraph{3D Shape Representation}
+3D occupancy grid has been a popular representation since conventional CNNs can be used to generate them~\cite{3dr2n2,kar2017lsm}.
+Point cloud representation for shape generation has been explored in~\cite{fan2017point,yang2018foldingnet,jia2020dv}.
+More recently, mesh representation is being increasingly used for 3D reconstruction~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} where a template mesh (an ellipsoid) is deformed to obtain the final shape.
+This approach struggles in reconstructing shapes whose topologies are very different from the template mesh.
+\cite{gkioxari2019meshrcnn} proposes a hybrid approach where a coarse occupancy grid is first predicted from single image which is converted to mesh representation and further refined using mesh deformations.
+We adopt a similar approach in our work where we predict the coarse occupancy grid from multi-view images which are used as the initial shape for succeeding refinements.
+
 
 \textcolor{Red}{
-\paragraph{3D Shape Representation.} 
 We can discuss about:
 1. Different representations of 3D shape in learning-based approaches. Please refer to the survey in Pixel2Mesh++.
 2. The existed works of initial mesh generation, and especially the limitations of such methods and the effect of initial mesh on the final results.
 3. To overcome such limitations, we use the voxel grid as the 3D representation of the initial mesh, and multi-view ... to obtain the initial mesh.
-\paragraph{Single-view Shape Generation.} 
+\paragraph{Single-view Shape Generation.}
 Point cloud, voxel grid and mesh... Maybe we can mainly focus on the voxel grid and mesh.
 \paragraph{Multi-view Shape Generation.}
 Mainly focus on the limitations of existed methods and how can we handle such limitations.
@@ -77,12 +89,12 @@ while \cite{mescheder2019occupancy,park2019deepsdf,liu2019learning,liu2019dist,m
 
 % We refer our readers to a recent survey on Deep Geometry Learning ~\cite{xiao2020survey} for a more comprehensive review of the related work on this topic.
 
-\paragraph{Depth Estimation}
-Compared to 3D shape generation, depth prediction is an easier problem formulation since it simplifies the task to per-view depth map estimation.
-Traditional methods ~\cite{campbell2008using,galliani2015massively,schonberger2016pixelwise} use multi-view stereo principles for depth prediction.
-Deep learning based multi-view stereo depth estimation was first introduced in~\cite{hartmann2017learned_16} where a learned cost metric is used to estimate patch similarities.
-DeepMVS~\cite{deepmvs2018} warps multi-view images to 3D space and then applies deep networks for regularization and aggregation to estimate depth images.
-Learned 3D cost volume based depth prediction was proposed in MVSNet~\cite{yao2018mvsnet} where a 3 dimensional cost volume is built using homographically warped 2D features from multi-view images and 3D CNNs are used for cost regularization and depth regression.
-This idea was further extended by~\cite{chen2019point,luo2019pmvsnet, gu2019cascade,yao2019recurrent}.
+% \paragraph{Depth Estimation}
+% Compared to 3D shape generation, depth prediction is an easier problem formulation since it simplifies the task to per-view depth map estimation.
+% Traditional methods ~\cite{campbell2008using,galliani2015massively,schonberger2016pixelwise} use multi-view stereo principles for depth prediction.
+% Deep learning based multi-view stereo depth estimation was first introduced in~\cite{hartmann2017learned_16} where a learned cost metric is used to estimate patch similarities.
+% DeepMVS~\cite{deepmvs2018} warps multi-view images to 3D space and then applies deep networks for regularization and aggregation to estimate depth images.
+% Learned 3D cost volume based depth prediction was proposed in MVSNet~\cite{yao2018mvsnet} where a 3 dimensional cost volume is built using homographically warped 2D features from multi-view images and 3D CNNs are used for cost regularization and depth regression.
+% This idea was further extended by~\cite{chen2019point,luo2019pmvsnet, gu2019cascade,yao2019recurrent}.
 
 % Our system aims to combine the strengths of GCN based methods and depth prediction methods to improve the accuracy of the 3D structure while still ensuring completeness.
