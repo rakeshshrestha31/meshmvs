@@ -13,6 +13,7 @@ def get_shapenet_cfg():
     cfg.MODEL = CN()
     cfg.MODEL.VOXEL_ON = False
     cfg.MODEL.MESH_ON = False
+    cfg.MODEL.LIMIT_MESH_SIZE = True
     # options: predicted_depth_only | rendered_depth_only | input_concat | input_diff | feature_concat | feature_diff
     cfg.MODEL.CONTRASTIVE_DEPTH_TYPE = "input_concat"
     cfg.MODEL.USE_GT_DEPTH = False

@@ -1014,32 +1014,37 @@ class VoxMeshDepthHead(VoxDepthHead):
         """
         Cubifies a voxel grid. Adapts the cubify threshold to limit mesh size
         """
-        threshold = self.cubify_threshold
-        MAX_V = 4000
-        MAX_F = 8500
-        while threshold < 0.9:
-            cubified_meshes = cubify(
-                voxel_scores, self.voxel_size, threshold
-            )
+        if not hasattr(self.cfg.MODEL, "LIMIT_MESH_SIZE") or self.cfg.MODEL.LIMIT_MESH_SIZE:
+            threshold = self.cubify_threshold
+            MAX_V = 4000
+            MAX_F = 8500
+            while threshold < 0.9:
+                cubified_meshes = cubify(
+                    voxel_scores, self.voxel_size, threshold
+                )
+                max_V = cubified_meshes.num_verts_per_mesh().float().max().item()
+                max_F = cubified_meshes.num_faces_per_mesh().float().max().item()
+                if max_V > MAX_V or max_F > MAX_F:
+                    threshold = threshold * 1.2
+                    print("mesh size ({}, {}) too large setting threshold to {}" \
+                            .format(max_V, max_F, threshold))
+                else:
+                    break
+
             max_V = cubified_meshes.num_verts_per_mesh().float().max().item()
             max_F = cubified_meshes.num_faces_per_mesh().float().max().item()
+
             if max_V > MAX_V or max_F > MAX_F:
-                threshold = threshold * 1.2
-                print("mesh size ({}, {}) too large setting threshold to {}" \
-                        .format(max_V, max_F, threshold))
-            else:
-                break
+                print("mesh size ({}, {}) still too large, using dummy mesh" \
+                        .format(max_V, max_F))
 
-        max_V = cubified_meshes.num_verts_per_mesh().float().max().item()
-        max_F = cubified_meshes.num_faces_per_mesh().float().max().item()
-
-        if max_V > MAX_V or max_F > MAX_F:
-            print("mesh size ({}, {}) still too large, using dummy mesh" \
-                    .format(max_V, max_F))
-
-            batch_size = voxel_scores.shape[0]
-            device = voxel_scores.device
-            cubified_meshes = dummy_mesh(batch_size, device)
+                batch_size = voxel_scores.shape[0]
+                device = voxel_scores.device
+                cubified_meshes = dummy_mesh(batch_size, device)
+        else:
+            cubified_meshes = cubify(
+                voxel_scores, self.voxel_size, self.cubify_threshold
+            )
 
         return cubified_meshes
 
