@@ -23,8 +23,14 @@ We adopt single-view voxel branch of~\cite{gkioxari2019meshrcnn} which consists 
 
 \paragraph{Probabilistic Occupancy Grid Merging}
 \siyu{Present a figure to demonstrate the ``probabilistic occupancy grid merging'', the intermediate results of this module.}
+\rakesh{The main system diagram shows the intermediate results, do we need another? I think we won't have enough space for it}
+
 \siyu{This method is inspired by the traditional occupancy grid merging approaches in robotics? If so, try to cite the references and tell the differences between yours and the existed ones.}
-Voxel occupancy grid predicted from a single viewpoint suffers from occlusion and limited visibility. In order to fuse voxel grids from different viewpoints, we propose a probabilistic occupancy grid merging method which merges the voxel grids from each input viewpoint probabilistically to obtain the final voxel grid output. This allows occluded regions in one view to be estimated from other views where those regions are visible as well as increase the confidence of prediction in overlapping regions.
+\rakesh{citations added}
+
+Voxel occupancy grid predicted from a single viewpoint suffers from occlusion and limited visibility.
+In order to fuse voxel grids from different viewpoints we take inspiration from occupancy map building techniques in robotics~\cite{grisetti2007improved,konolige1997improved} and propose a probabilistic occupancy grid merging method which merges the voxel grids from each input viewpoint probabilistically to obtain the final voxel grid output.
+This allows occluded regions in one view to be estimated from other views where those regions are visible as well as increase the confidence of prediction in overlapping regions.
 Occupancy probability of each voxel is represented by $p(x)$ which is converted to log-odds (logit):
 % \footnote{In practice the \emph{voxel branch} directly predicts the log-odds instead of probabilities}
 
