@@ -1068,8 +1068,12 @@ class VoxMeshDepthHead(VoxDepthHead):
             )
             cubified_meshes = dummy_meshes
         else:
-            cubified_meshes = self.cubify(
-                voxel_head_output["merged_voxel_scores"]
+            # cubified_meshes = self.cubify(
+            #     voxel_head_output["merged_voxel_scores"]
+            # )
+            cubified_meshes = cubify(
+                voxel_head_output["merged_voxel_scores"],
+                self.voxel_size, self.cubify_threshold
             )
             mesh_head_output = self.forward_mesh_head(
                 imgs, voxel_head_output["masked_pred_depths"],
