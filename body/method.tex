@@ -1,14 +1,22 @@
 \section{Methodology}
 \siyu{The current content of the ``Methodology'' section is too limited, try to expand this content.}
 
-\figref{system_architecture} shows the architecture of the proposed system which takes as input multi-view color images of an object with known poses and outputs a triangle mesh representing the surface of the object.
+\figref{system_architecture} shows the architecture of the proposed system which takes as input multi-view color images of an object with known poses and outputs a triangle mesh of the object $ T = (V, F) $ where $ V = \{ v_i \in \mathbb{R}^3\} $ is the set of vertex coordinates and $ F \subseteq V \times V \times V $ is the set of faces.
+The multi-view voxel grid prediction module (\subsecref{multiview_voxel}) first predicts a coarse voxel grid of the object.
+The voxel grid is converted to mesh representation by \texttt{cubify} operation which is further refined by the mesh refinement module (\subsecref{mesh_refinement}).
+A series of Graph Convolution Networks (GCN) deforms the cubified voxel grid to obtain surface mesh.
+The GCNs use multi-view contrastive depth features from concatenated predicted and rendered depth along with RGB features as input to deform the input mesh.
+Depth images are predicted using an extended MVSNet network~\cite{yao2018mvsnet}.
+The multi-view features are fused using attention mechanism.
+
 \siyu{Before Section 3.1, at least two point should be mentioned: 1. The input and output of this approach, including some notations. 2. An overview of the whole methodology including some reference of the explicit sections. And it is also a hierarchical structure of the ``Methodology'' section.}
+\rakesh{updated the paragraph}
 
 \subsection{Multi-view Voxel Grid Prediction}
 \label{subsec:multiview_voxel}
 
 \paragraph{Single-view Voxel Grid Prediction}
-The single-view voxel branch consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network. It generates the coarse initial shape of an object from one viewpoint as voxel occupancy grid using a color image. Here, we set the resolution of the generated voxel occupancy grid as 32 $\times$ 32 $\times$ 32. The voxel prediction networks for all viewpoints share the same weights.
+The single-view voxel branch consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network. It generates the coarse initial shape of an object from one viewpoint as voxel occupancy grid using a color image. Here, we set the resolution of the generated voxel occupancy grid as 48 $\times$ 48 $\times$ 48. The voxel prediction networks for all viewpoints share the same weights.
 % following Mesh R-CNN~\cite{gkioxari2019meshrcnn}.
 \siyu{Should cite MeshRCNN reference here. As well, the implementation differences should be detailized here.}
 
@@ -38,6 +46,7 @@ The final voxel probability $x$ is obtained by applying the inverse function of 
 \siyu{We should add an experiment and study the effect of the quality of the initial mesh on the final mesh reconstruction results, including the ellipsoid, single-view MeshRCNN, our MeshRCNN with different number of views.}
 
 \subsection{Mesh Refinement}
+\label{subsec:mesh_refinement}
 \siyu{Present a figure to explain the detailed mechanism of the mesh refinement module.}
 The \texttt{cubified} mesh from the voxel branch only provides a coarse reconstruction of the object's surface. We apply graph convolutional networks which represent each mesh vertex as one graph node and deforms them to more accurate positions.
 
