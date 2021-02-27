@@ -55,7 +55,26 @@ The final voxel probability $x$ is obtained by applying the inverse function of 
 \subsection{Mesh Refinement}
 \label{subsec:mesh_refinement}
 \siyu{Present a figure to explain the detailed mechanism of the mesh refinement module.}
-The \texttt{cubified} mesh from the voxel branch only provides a coarse reconstruction of the object's surface. We apply graph convolutional networks which represent each mesh vertex as one graph node and deforms them to more accurate positions.
+\rakesh{I think the system architecture diagram and constrastive feature extraction diagram presents most of the details except graph convolution network and attention implementation. Do we want to show GCN and attention details in figures?}
+The \texttt{cubified} mesh from the voxel branch only provides a coarse reconstruction of the object's surface. We apply graph convolutional networks which represent each mesh vertex as one graph node and deforms them to more accurate positions based on RGB and contrastive depth features.
+
+\label{subsec:depth_prediction}
+\paragraph{Multi-View Depth Estimation}
+\siyu{In order to explain how can we obtain the initial depth images as the input, this paragraph should be put in front of the ``Mesh Refinement'' section, or the front of the ``3. Methodology''. We donot have to mention the details of MVS-Net, while some implementation details, like the view selection mechanism, resolution, network structure design, any difference from the standard MVS-Net or Cas-MVSNet.}
+\rakesh{Paragraph moved to start of ``Mesh Refinement'' subsection. More details added}
+We extend MVSNet~\cite{yao2018mvsnet} and predict the depth maps of all views since the original implementation predicts depth of only one reference view.
+This is achieved by transforming the feature volumes to each view's coordinate frame using homography warping
+and applying identical cost volume regularization and depth regression on each view.
+Detailed network architecture diagram of this module is provided in the appendix.
+Unlike~\cite{yao2018mvsnet}, we do not apply input image view selection and use the input views from~\cite{3dr2n2,wen2019pixel2mesh++} for fair comparison.
+We set the number of depth hypothesis to $48$ which is equivalent to $25$ mm resolution.
+\siyu{Do we have to add an experiment and compare the results give different settings of MVS-Net, such as the resolution of the depth images or we can add some noise to the depth. That is to study the effect of the quality of the depth on the final mesh reconstruction results and how sensitive is the refinement module to the depth quality.}
+
+% which constructs a regularized 3D cost volumes
+% to estimate the depth map of the reference view.
+% Here, we extend MVSNet to predict the depth maps of all views instead of only the reference view.
+
+% This allows the reuse of pre-regularization feature volumes for efficient multi-view depth prediction invariant to the order of input images.
 
 \paragraph{GCN-based Mesh Deformation}
 \siyu{The intuition and basic operations of graph-cnn-based mesh deformation should be given first. Then, how does the previous approach obtain the features. Any limitations and problems of the previous approaches?}
@@ -79,7 +98,7 @@ Each GCN block utilizes several graph convolutions to transform the vertex featu
     \vspace{-4mm}
         \caption{Contrastive feature extraction. Rendered depths of the current shape along with the predicted depths for each view are concatenated and VGG-based feature extractor is applied. The multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
         \vspace{-4mm}
-        \label{fig:failure_cases}
+        \label{fig:contrastive_feature_extractor}
 \end{figure}
 
 \cite{yao2020front2back} demonstrate that using intermediate, image-centric 2.5D representations instead of directly generating 3D shapes in global frame from raw 2D images can improve 3D reconstruction quality.
@@ -96,21 +115,6 @@ We use VGG-16~\cite{simonyan2014vgg} as our contrastive depth feature extraction
 % and allows the network to reason about the deformation required better than when using predicted depths alone.
 % Multiple methods for augmenting the two depths were tried among which using concatenated rendered and predicted depth as input for depth feature extraction gave the best result.
 % Along with the contrastive depth features, we also use the RGB features from ResNet calculated for voxel branch as input for mesh deformation as well.
-
-\label{subsec:depth_prediction}
-\paragraph{Multi-View Depth Estimation}
-\siyu{In order to explain how can we obtain the initial depth images as the input, this paragraph should be put in front of the ``Mesh Refinement'' section, or the front of the ``3. Methodology''. We donot have to mention the details of MVS-Net, while some implementation details, like the view selection mechanism, resolution, network structure design, any difference from the standard MVS-Net or Cas-MVSNet.}
-We extend MVSNet~\cite{yao2018mvsnet} and predict the depth maps of all views since the original implementation predicts depth of only one reference view.
-This is achieved by transforming the feature volumes to each view's coordinate frame using homography warping
-and applying identical cost volume regularization and depth regression on each view.
-Detailed network architecture diagram of this module is provided in the appendix.
-\siyu{Do we have to add an experiment and compare the results give different settings of MVS-Net, such as the resolution of the depth images or we can add some noise to the depth. That is to study the effect of the quality of the depth on the final mesh reconstruction results and how sensitive is the refinement module to the depth quality.}
-
-% which constructs a regularized 3D cost volumes
-% to estimate the depth map of the reference view.
-% Here, we extend MVSNet to predict the depth maps of all views instead of only the reference view.
-
-% This allows the reuse of pre-regularization feature volumes for efficient multi-view depth prediction invariant to the order of input images.
 
 \begin{figure*}[t]
 \begin{center}
