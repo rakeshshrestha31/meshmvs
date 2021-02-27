@@ -16,9 +16,10 @@ The multi-view features are fused using attention mechanism.
 \label{subsec:multiview_voxel}
 
 \paragraph{Single-view Voxel Grid Prediction}
-The single-view voxel branch consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network. It generates the coarse initial shape of an object from one viewpoint as voxel occupancy grid using a color image. Here, we set the resolution of the generated voxel occupancy grid as 48 $\times$ 48 $\times$ 48. The voxel prediction networks for all viewpoints share the same weights.
+We adopt single-view voxel branch of~\cite{gkioxari2019meshrcnn} which consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network. It generates the coarse initial shape of an object from one viewpoint as voxel occupancy grid using a color image. Here, we set the resolution of the generated voxel occupancy grid as 48 $\times$ 48 $\times$ 48. The voxel prediction networks for all viewpoints share the same weights.
 % following Mesh R-CNN~\cite{gkioxari2019meshrcnn}.
 \siyu{Should cite MeshRCNN reference here. As well, the implementation differences should be detailized here.}
+\rakesh{cited Mesh RCNN, there are no implementation difference}
 
 \paragraph{Probabilistic Occupancy Grid Merging}
 \siyu{Present a figure to demonstrate the ``probabilistic occupancy grid merging'', the intermediate results of this module.}
