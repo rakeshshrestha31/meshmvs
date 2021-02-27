@@ -59,15 +59,29 @@ The \texttt{cubified} mesh from the voxel branch only provides a coarse reconstr
 
 \paragraph{GCN-based Mesh Deformation}
 \siyu{The intuition and basic operations of graph-cnn-based mesh deformation should be given first. Then, how does the previous approach obtain the features. Any limitations and problems of the previous approaches?}
-The features pooled from multi-view images along with 3D coordinates of the vertices in world frame are used as features of the graph nodes.
-Series of Graph-based Convolutional Network (GCN) blocks are applied to deform a mesh at the current stage to the next stage, starting with the \texttt{cubified} voxel grids.
+
 A graph convolution deforms mesh vertices by propagating features from neighboring vertices by applying
 $f_{i}^{'} = ReLU(W_0f_i + \sum_{j \in \mathcal{N}(i)} W_1 f_j)$ where $\mathcal{N}(i)$ is the set of neighboring vertices of the \emph{i}-th vertex in the mesh, $f_{\{\}}$ represents the feature vector of a vertex, and $W_0$ and $W_1$ are learnable parameters of the model.
+The features pooled from multi-view images (discussed in subsequent paragraphs) along with 3D coordinates of the vertices in world frame are used as features of the graph nodes.
+Series of Graph-based Convolutional Network (GCN) blocks are applied to deform a mesh at the current stage to the next stage, starting with the \texttt{cubified} voxel grids.
 Each GCN block utilizes several graph convolutions to transform the vertex features along with a final \emph{vertex refinement} operation where the features along with vertex coordinates are further transformed as $v_i^{'} = v_i + tanh(W_{vert}[f_i;v_i])$ where the matrix $W_{vert}$ is another learnable parameter to obtain the deformed mesh.
 
 \label{subsec:contrastive_depth_feature_extraction}
 \paragraph{Contrastive Depth Feature Extraction}
+
 \siyu{Can you give a figure demonstrating the module of contrastive depth feature extraction? Since in Figure 1 of the ICLR submitted paper, you also input the RGBD feature maps from ResNet, do you still use it?}
+\rakesh{Figure added. RGBD features are still used and the new system diagram also shows it}
+
+\begin{figure}[h!]
+    \begin{center}
+        \includegraphics[width=\linewidth]{imgs/contrastive_feature_extractor.png}
+    \end{center}
+    \vspace{-4mm}
+        \caption{Contrastive feature extraction. Rendered depths of the current shape along with the predicted depths for each view are concatenated and VGG-based feature extractor is applied. The multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
+        \vspace{-4mm}
+        \label{fig:failure_cases}
+\end{figure}
+
 \cite{yao2020front2back} demonstrate that using intermediate, image-centric 2.5D representations instead of directly generating 3D shapes in global frame from raw 2D images can improve 3D reconstruction quality.
 We therefore propose to formulate the features for graph nodes using 2.5D depth maps as input additional inputs alongside the RGB features.
 % and \zhiwen{todo} to contrast the depth map at current refinement stage against the predicted depths.
