@@ -77,7 +77,7 @@ We set the number of depth hypothesis to $48$ which is equivalent to $25$ mm res
 % This allows the reuse of pre-regularization feature volumes for efficient multi-view depth prediction invariant to the order of input images.
 
 \paragraph{GCN-based Mesh Deformation}
-\siyu{The intuition and basic operations of graph-cnn-based mesh deformation should be given first. Then, how does the previous approach obtain the features. Any limitations and problems of the previous approaches?}
+\siyu{The intuition and basic operations of graph-cnn-based mesh deformation should be given first}
 
 A graph convolution deforms mesh vertices by propagating features from neighboring vertices by applying
 $f_{i}^{'} = ReLU(W_0f_i + \sum_{j \in \mathcal{N}(i)} W_1 f_j)$ where $\mathcal{N}(i)$ is the set of neighboring vertices of the \emph{i}-th vertex in the mesh, $f_{\{\}}$ represents the feature vector of a vertex, and $W_0$ and $W_1$ are learnable parameters of the model.
@@ -96,12 +96,14 @@ Each GCN block utilizes several graph convolutions to transform the vertex featu
         \includegraphics[width=\linewidth]{imgs/contrastive_feature_extractor.png}
     \end{center}
     \vspace{-4mm}
-        \caption{Contrastive feature extraction. Rendered depths of the current shape along with the predicted depths for each view are concatenated and VGG-based feature extractor is applied. The multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
+        \caption{Contrastive feature extraction. Rendered depths of the current shape along with the predicted depths for each view are concatenated and VGG-based feature extractor is applied. Then along with the ResNet RGB features, the multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
         \vspace{-4mm}
         \label{fig:contrastive_feature_extractor}
 \end{figure}
 
-\cite{yao2020front2back} demonstrate that using intermediate, image-centric 2.5D representations instead of directly generating 3D shapes in global frame from raw 2D images can improve 3D reconstruction quality.
+\siyu{How does the previous approach obtain the features. Any limitations and problems of the previous approaches?}
+\rakesh{comparison with previous approach added}
+\cite{yao2020front2back} demonstrate that using intermediate, image-centric 2.5D representations instead of directly generating 3D shapes in global frame from raw 2D images~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} can improve 3D reconstruction quality.
 We therefore propose to formulate the features for graph nodes using 2.5D depth maps as input additional inputs alongside the RGB features.
 % and \zhiwen{todo} to contrast the depth map at current refinement stage against the predicted depths.
 Specifically, we render the meshes at different GCN stages to depth image at all the input views using~\cite{kato2018renderer} and use them along with predicted depths for depth feature extraction. We call this form of depth input \texttt{contrastive depth} as it contrasts the rendered depths of the current mesh against the predicted depths and allows the network to reason about the deformation better than when using predicted depth or color images alone.
@@ -180,13 +182,15 @@ We visualize the learned attention weights (average of each attention heads) in~
 % For training the mesh generation, we use the loss terms from~\cite{wang2018pixel2mesh} along with new losses based on our formulation.
 
 \paragraph{Mesh losses}
-The losses which are derived from~\cite{wang2018pixel2mesh} to constrain the mesh predicted by each GCN block (P) to resemble the ground truth (Q) include
-Chamfer distance $\mathcal{L}_{\text{chamfer}}(\text{P}, \text{Q}) = |\text{\text{P}}|^{-1} \sum_{(p, q) \in \Lambda_{\text{P},\text{Q}}}{||p-q||^{2}} + |\text{Q}|^{-1} \sum_{(q, p) \in \Lambda_{\text{Q},\text{P}}}{||q-p||^{2}}$
-and surface normal loss
-$\mathcal{L}_{\text{normal}}(\text{P}, \text{Q}) = -|\text{P}|^{-1} \sum_{(p, q) \in \Lambda_{\text{P},\text{Q}}}{|u_p \cdot u_q|} - |\text{Q}|^{-1} \sum_{(q, p) \in \Lambda_{\text{Q},\text{P}}}{|u_q \cdot u_p|}$
-with additional regularization in the form of edge length loss
+To constrain the mesh predicted by each GCN block (P) to resemble the ground truth (Q) we use
+Chamfer distance~\cite{fan2017point} between nearest neighbor mesh vertices $\Lambda$ i.e.
+$\mathcal{L}_{\text{chamfer}}(\text{P}, \text{Q}) = |\text{\text{P}}|^{-1} \sum_{(p, q) \in \Lambda_{\text{P},\text{Q}}}{||p-q||^{2}} + |\text{Q}|^{-1} \sum_{(q, p) \in \Lambda_{\text{Q},\text{P}}}{||q-p||^{2}}$ to learn to deform vertices to correct positions
+along with surface normal loss between vertex normals~\cite{wang2018pixel2mesh}
+$\mathcal{L}_{\text{normal}}(\text{P}, \text{Q}) = -|\text{P}|^{-1} \sum_{(p, q) \in \Lambda_{\text{P},\text{Q}}}{|u_p \cdot u_q|} - |\text{Q}|^{-1} \sum_{(q, p) \in \Lambda_{\text{Q},\text{P}}}{|u_q \cdot u_p|}$ to learn local higher order surface properties.
+Additional regularization in the form of edge length loss
 $\mathcal{L}_{\text{edge}}(\text{V}, \text{E}) = \frac{1}{|E|} \sum_{(v,v') \in E}{||v - v'||^2}$
-for visually appealing results.
+is also applied
+which penalizes long edges resulting in flying vertices~\cite{wang2018pixel2mesh} for visually appealing results.
 % \cite{wen2019pixel2mesh++} report improved performance when using Chamfer distance loss where the predicted mesh is re-sampled to obtain a point cloud with larger number of points.
 % We do not observe such improvements (the performance is even worse).
 % Note that~\cite{wen2019pixel2mesh++} uses mesh generated by Pixel2Mesh~\cite{wang2018pixel2mesh} as input and further refines it while our predictions are obtained without such initialization which might explain this difference.
@@ -200,13 +204,12 @@ Note that the original MVSNet uses L1-loss, but we used BerHu loss since it gave
 Intuitively, this is because BerHu provides a good balance between L1 and L2 loss and has shown similar improvement in~\cite{laina2016deeper}.
 
 \paragraph{Contrastive depth loss}
-% Additional loss terms for mesh generation supervision can be derived from the available depth predictions at different views to add extra constraints on the generated mesh, providing a form of self-supervision.
 % The meshes predicted by different GCN blocks are differentiably rendered from the viewpoints of the predicted depth images and
-BerHu loss is also applied between the rendered depth images at different GCN stages and the predicted depth images.
-% which encourages the predicted mesh to conform to the predicted depths.
+BerHu loss is also applied between the rendered depth images at different GCN stages and the predicted depth images
+which encourages the predicted mesh to conform to the predicted depths
 $\mathcal{L}_{contrastive} = |x|, & \text{if}\ |x| \le c \text{, otherwise } \frac{x^2 + c^2}{2c}$
 
-\paragraph{Voxel loss} Binary cross-entropy loss between the predicted voxel occupancy probabilities and the ground truth occupancies is used as voxel loss to supervise the voxel predictions
+\paragraph{Voxel loss} Binary cross-entropy loss between the predicted voxel occupancy probabilities and the ground truth occupancies is used as voxel loss to supervise the voxel predictions to constrain the coarse initial shapes~\cite{gkioxari2019meshrcnn}
 % Voxel loss is introduced for the final probabilistically merged voxel grid as well as the voxel grids of individual views.
 $\mathcal{L}_{\text{voxel}} = -{\Big(p(x) log\big(p(x)\big) + \big(1 - p(x)\big)log\big(1 - p(x)\big)\Big)}$
 
@@ -215,3 +218,4 @@ $\mathcal{L} = \lambda_{\text{chamfer}}\mathcal{L}_{\text{chamfer}} + \lambda_{\
 , where $\mathcal{L}$ is the final loss term.
 
 \siyu{We should discuss each loss function in more details. In addition, the description of $\mathcal{L}_{\text{chamfer}}$, $\mathcal{L}_{\text{normal}}$ and $\mathcal{L}_{\text{edge}}$ should be discussed in more details, including the intuition and functionality.}
+\rakesh{Additional discussions added, original work using the losses cited for further reference}
