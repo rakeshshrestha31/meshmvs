@@ -23,6 +23,11 @@ def default_argument_parser():
     parser.add_argument("--eval-only", action="store_true", help="perform evaluation only")
     parser.add_argument("--eval-p2m", action="store_true", help="pix2mesh evaluation mode")
     parser.add_argument("--eval-vox", action="store_true", help="voxel head evaluation mode")
+    parser.add_argument(
+        "--eval-latest-checkpoint",
+        action="store_true",
+        help="whether to use latest checkpoint weights, otherwise best weights are used"
+    )
     parser.add_argument("--no-color", action="store_true", help="disable colorful logging")
     parser.add_argument("--num-gpus", type=int, default=1, help="number of gpus per machine")
     parser.add_argument("--num-machines", type=int, default=1)
