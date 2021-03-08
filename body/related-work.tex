@@ -1,31 +1,13 @@
 \section{Related Work}
-\siyu{I think the classification of related works in Pixel2Mesh++ is more reasonable, that is 3D shape representation, single-view shape generation, and multi-view shape generation.
-The ``Traditional Shape Generation Methods'' can be merged into ``single-view shape generation'' and ``multi-view shape generation''. We donot have to survey ``Depth Estimation'', which seems irrelevant to our approach.}
-\rakesh{
-    Depth estimation survey removed.
-    Added paragraph for 3D Shape representation
-    Restructured the related work categories to single-view and multi-view methods
-}
+In this section, we first focus on the representation issue of 3D deep learning. Afterwards, a brief review of shape generation approaches based on single view and multiple views is represented respectively.  
 
-\paragraph{3D Shape Representation}
+\paragraph{3D Shape Representation}\vspace{-4mm}
 3D occupancy grid has been a popular representation since conventional CNNs can be used to generate them~\cite{3dr2n2,kar2017lsm}.
 More recently, mesh representation is being increasingly used for 3D reconstruction~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} where a template mesh (an ellipsoid) is deformed to obtain the final shape.
-This approach struggles in reconstructing shapes whose topologies are very different from the template mesh.
+This approach struggles in reconstructing shapes whose topology is very different from the template mesh.
 \cite{gkioxari2019meshrcnn} proposes a hybrid approach where a coarse occupancy grid is first predicted from single image which is converted to mesh representation and further refined using mesh deformations.
 We adopt a similar approach in our work where we predict the coarse occupancy grid from multi-view images which are used as the initial shape for succeeding refinements.
 Other shape representations include point clouds~\cite{fan2017point,yang2018foldingnet,jia2020dv}, implicit surfaces~\cite{park2019deepsdf}, depth images~\cite{yao2018mvsnet,yao2019recurrent} etc.
-
-
-\textcolor{Red}{
-We can discuss about:
-1. Different representations of 3D shape in learning-based approaches. Please refer to the survey in Pixel2Mesh++.
-2. The existed works of initial mesh generation, and especially the limitations of such methods and the effect of initial mesh on the final results.
-3. To overcome such limitations, we use the voxel grid as the 3D representation of the initial mesh, and multi-view ... to obtain the initial mesh.
-\paragraph{Single-view Shape Generation.}
-Point cloud, voxel grid and mesh... Maybe we can mainly focus on the voxel grid and mesh.
-\paragraph{Multi-view Shape Generation.}
-Mainly focus on the limitations of existed methods and how can we handle such limitations.
-}
 
 \begin{figure*}[t]
 \begin{center}
@@ -33,17 +15,14 @@ Mainly focus on the limitations of existed methods and how can we handle such li
 \end{center}
 \caption{
     \textbf{Architecture of the proposed method}.
-    The \emph{voxel grid prediction module} predicts coarse voxel grid representation by using CNN to predict voxel grids for each input image and then probabilistically merging them.
-    A series of \emph{GCN}s further refine the cubified voxel grid in a coarse-to-fine manner
-    using \emph{contrastive depth features} from rendered depths of the current shape and the predicted depths from \emph{depth prediction module} along with RGB image features.
-    Multi-view features are pooled using a attention-based mechanism.
-    \siyu{Replace this figure with a simplified one and add a long caption describing the whole framework.}
-    \rakesh{simplified figure has been placed and caption has been expanded}
+    First, the voxel grid prediction module obtains a coarse voxel grid representation by probabilistically merging predicted voxel grids of each input image.
+    Then, a series of GCNs further refine the cubified voxel grid in a coarse-to-fine manner using contrastive features from the rendered depths of the current shape and the depths from multi-view stereo.
+    Specifically, the multi-view features are pooled using a attention-based mechanism.
 }
 \label{fig:system_architecture}
 \end{figure*}
 
-\paragraph{Single-view Shape Generation.}
+\paragraph{Single-view Shape Generation.}\vspace{-4mm}
 Traditional single-view shape generation methods like~\cite{durou2008numerical,zhang1999shape,favaro2005geometric} reason about shading, texture and defocus to reason about visible parts of the object and infer its 3D geometry.
 Earlier learning-based approaches~\cite{huang2015single, su2014estimating} use shape component retrieval and deformation from a large dataset for single-view 3D shape generation.
 \cite{kurenkov2018deformnet} extend this idea by introducing free-form deformation networks on retrieved object templates from a database.
@@ -58,7 +37,7 @@ FoldingNet~\cite{yang2018foldingnet} learns to reconstruct arbitrary point cloud
 AtlasNet~\cite{groueix2018papier} use learned parametric representation
 while \cite{mescheder2019occupancy,park2019deepsdf,liu2019learning,liu2019dist,murez2020atlas} employ implicit surface representation to reconstruct 3D shapes.
 
-\paragraph{Multi-view Shape Generation.}
+\paragraph{Multi-view Shape Generation.}\vspace{-4mm}
 Multi-view 3D model generation has traditionally been tackled using stereo geometry principles.
 Among them, structure-from-motion (SfM)~\cite{schonberger2016structure,agarwal2011building,cui2015global,cui2017hsfm} and simultaneous localization and mapping (SLAM)~\cite{cadena2016pastslam,mur2015orb,engel2014lsd,whelan2015elasticfusion} are popular techniques that perform 3D reconstruction and camera pose estimation at the same time.
 % Closer to our problem setup, multi-view stereo methods infer 3D geometry from images with known camera parameters.
@@ -73,8 +52,8 @@ Deep learning based approaches can learn to infer 3D structure from training dat
 \cite{hartmann2017learned_16,deepmvs2018,yao2018mvsnet,chen2019point,luo2019pmvsnet,gu2019cascade,yao2019recurrent} propose multi-view stereo models from learned cost volumes to predict depth images.
 Recurrent Neural Networks (RNN) based methods~\cite{3dr2n2, kar2017lsm, mcrecon2017} are another popular solution to solve this problem.
 \cite{mcrecon2017, lin2019photometric} introduce image silhouettes along with adversarial multi-view constraints and optimize object mesh models using multi-view photometric constraints.
-Pixel2Mesh++~\cite{wen2019pixel2mesh++} extends single-view Pixel2Mesh~\cite{wang2018pixel2mesh} to multi-view image input by introducing cross-view perceptual feature pooling and multi-view deformation reasoning but struggles to reconstruct complex shape topologies due to its use of ellipsoidal template shape which it deforms to the final shape.
-Our work avoids this pitfall by first predicting a coarse volumetric model which can represent complex topologies and then applying deformations on it to get a finer shape as the final model.
+Pixel2Mesh++~\cite{wen2019pixel2mesh++} extends single-view Pixel2Mesh~\cite{wang2018pixel2mesh} to multi-view image input by introducing cross-view perceptual feature pooling and multi-view deformation reasoning but struggles to reconstruct complex shape topology due to its use of ellipsoidal template shape which it deforms to the final shape.
+Our work avoids this pitfall by first predicting a coarse volumetric model which can represent complex topology and then applying deformations on it to get a finer shape as the final model.
 
 % Pixel2Mesh~\cite{wang2018pixel2mesh} utilizes a single image of an object to predict its triangle mesh using perceptual features extracted from the image as GCN input.
 % Voxel2Mesh~\cite{wickramasinghe2019voxel2mesh} extends Pixel2Mesh by using 3D volumes as input instead of 2D images.
