@@ -48,12 +48,14 @@ We then apply the graph convolutional network in which the mesh vertex and edges
 
 \label{subsec:depth_prediction}
 \paragraph{Multi-View Depth Estimation}\vspace{-4mm}
-We extend MVSNet~\cite{yao2018mvsnet} and predict the depth maps of all views since the original implementation predicts depth of only one reference view.
-This is achieved by transforming the feature volumes to each view's coordinate frame using homography warping
-and applying identical cost volume regularization and depth regression on each view.
-Detailed network architecture diagram of this module is provided in the appendix.
-Unlike~\cite{yao2018mvsnet}, we do not apply input image view selection and use the input views from~\cite{3dr2n2,wen2019pixel2mesh++} for fair comparison.
-We set the number of depth hypothesis to $48$ which is equivalent to $25$ mm resolution.
+To obtain the depth image of each RGB image, we iteratively regard each view as the reference and apply the standard MVSNet~\cite{yao2018mvsnet}.
+In implementation, we discard the policy of view selection, and set the number of depth hypothesis to $48$ which is equivalent to a resolution of $25$ mm.
+
+% We extend MVSNet~\cite{yao2018mvsnet} and predict the depth maps of all views since the original implementation predicts depth of only one reference view.
+% This is achieved by transforming the feature volumes to each view's coordinate frame using homography warping
+% and applying identical cost volume regularization and depth regression on each view.
+% Detailed network architecture diagram of this module is provided in the appendix.
+
 
 % which constructs a regularized 3D cost volumes
 % to estimate the depth map of the reference view.
@@ -62,33 +64,41 @@ We set the number of depth hypothesis to $48$ which is equivalent to $25$ mm res
 % This allows the reuse of pre-regularization feature volumes for efficient multi-view depth prediction invariant to the order of input images.
 
 \paragraph{GCN-based Mesh Deformation}\vspace{-4mm}
-A graph convolution deforms mesh vertices by propagating features from neighboring vertices by applying
-$f_{i}^{'} = ReLU(W_0f_i + \sum_{j \in \mathcal{N}(i)} W_1 f_j)$ where $\mathcal{N}(i)$ is the set of neighboring vertices of the \emph{i}-th vertex in the mesh, $f_{\{\}}$ represents the feature vector of a vertex, and $W_0$ and $W_1$ are learnable parameters of the model.
+Following the prestigious previous works~\cite{wang2018pixel2mesh,wen2019pixel2mesh++}, a graph convolution deforms mesh vertices by propagating features from neighboring vertices by applying:
+\begin{equation}
+f_{i}^{'} = ReLU(W_0f_i + \sum_{j \in \mathcal{N}(i)} W_1 f_j),
+\end{equation}
+where $\mathcal{N}(i)$ is the set of neighboring vertices of the \emph{i}-th vertex in the mesh, $f_{\{\}}$ represents the feature vector of a vertex, and $W_0$ and $W_1$ are learnable parameters of the model.
 The features pooled from multi-view images (discussed in subsequent paragraphs) along with 3D coordinates of the vertices in world frame are used as features of the graph nodes.
-Series of Graph-based Convolutional Network (GCN) blocks are applied to deform a mesh at the current stage to the next stage, starting with the \texttt{cubified} voxel grids.
-Each GCN block utilizes several graph convolutions to transform the vertex features along with a final \emph{vertex refinement} operation where the features along with vertex coordinates are further transformed as $v_i^{'} = v_i + tanh(W_{vert}[f_i;v_i])$ where the matrix $W_{vert}$ is another learnable parameter to obtain the deformed mesh.
+Series of Graph-based Convolutional Network (GCN) blocks are applied to deform a mesh at the current stage to the next stage, starting with the cubified voxel grids.
+Each GCN block utilizes several graph convolutions to transform the vertex features along with a final vertex refinement operation where the features along with vertex coordinates are further transformed as:
+\begin{equation}
+v_i^{'} = v_i + tanh(W_{vert}[f_i;v_i]).
+\end{equation}
+Here, $v_i$ and $v_i^{'}$ represent the vertex coordinates before and after each refinement operation, and the matrix $W_{vert}$ is another learnable parameter to obtain the deformed mesh.
 
 \label{subsec:contrastive_depth_feature_extraction}
 \paragraph{Contrastive Depth Feature Extraction}\vspace{-4mm}
-\begin{figure}[h!]
+\begin{figure}[th!]
     \begin{center}
         \includegraphics[width=\linewidth]{imgs/contrastive_feature_extractor.png}
     \end{center}
-    \vspace{-4mm}
         \caption{Contrastive feature extraction. Rendered depths of the current shape along with the predicted depths for each view are concatenated and VGG-based feature extractor is applied. Then along with the ResNet RGB features, the multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
-        \vspace{-4mm}
         \label{fig:contrastive_feature_extractor}
 \end{figure}
 
-\cite{yao2020front2back} demonstrate that using intermediate, image-centric 2.5D representations instead of directly generating 3D shapes in global frame from raw 2D images~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} can improve 3D reconstruction quality.
-We therefore propose to formulate the features for graph nodes using 2.5D depth maps as input additional inputs alongside the RGB features.
-% and \zhiwen{todo} to contrast the depth map at current refinement stage against the predicted depths.
-Specifically, we render the meshes at different GCN stages to depth image at all the input views using~\cite{kato2018renderer} and use them along with predicted depths for depth feature extraction. We call this form of depth input \texttt{contrastive depth} as it contrasts the rendered depths of the current mesh against the predicted depths and allows the network to reason about the deformation better than when using predicted depth or color images alone.
+Inspired by the work~\cite{yao2020front2back} that incorporating intermediate and image-centric 2.5D representations instead of directly generating 3D shapes from only RGB images~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} can improve 3D reconstruction quality.
+As shown in Figure~\ref{fig:contrastive_feature_extractor}, we therefore propose to formulate the features of graph nodes using depth images as the additional inputs alongside with the RGB features.
+At a single viewpoint, we consider two sources of depth images, namely the rendered depth from the meshes at different GCN stages and the corresponding input depth from multi-view stereo.
+We apply the approach proposed in~\cite{kato2018renderer} for differentiable rendering.
+Afterwards, we propose a contrastive feature extractor which contrasts the rendered depth of the current mesh against the input depth from multi-view stereo and guides the GCN to reason about the deformation.
+We use VGG-16~\cite{simonyan2014vgg} as our contrastive depth feature extraction network.
+Given the 2D feature maps, the feature vector of each graph node can be obtained by projecting its 3D coordinate to the corresponding feature map using known camera parameters.
+
+% Specifically, we render the meshes at different GCN stages to depth image at all the input views using~\cite{kato2018renderer} and use them along with predicted depths for depth feature extraction. We call this form of depth input \texttt{contrastive depth} as it contrasts the rendered depths of the current mesh against the predicted depths and allows the network to reason about the deformation better than when using predicted depth or color images alone.
 % construct the feature vector from semantic features of the input color images~\cite{wang2018pixel2mesh}, we formulate the input for feature extraction network using geometry representations.
 % However, works similar to Pixel2Mesh~\cite{wang2018pixel2mesh} construct the feature vector from semantic features of the input color images. Here, we formulate the input for feature extraction network using geometry representations. Specifically, we render the meshes at different GCN stages to depth image at all the input views using~\cite{kato2018renderer} and augment them as additional inputs for depth feature extraction.
 % We call this form of depth input \emph{contrastive depth} as it contrasts the rendered depths of the current mesh against the predicted depths and constrain the deformed mesh in a coarse-to-fine manner.
-Given the 2D features, corresponding feature vectors of individual vertices can be found by projecting the 3D vertex coordinates to the feature planes using known camera parameters.
-We use VGG-16~\cite{simonyan2014vgg} as our contrastive depth feature extraction network.
 % Along with the contrastive depth features, we also use the RGB features from ResNet calculated for voxel branch as input for mesh deformation as well.
 
 % and allows the network to reason about the deformation required better than when using predicted depths alone.
@@ -109,31 +119,33 @@ We use VGG-16~\cite{simonyan2014vgg} as our contrastive depth feature extraction
 
 \paragraph{Attention-based Multi-View Feature Pooling}\vspace{-4mm}
 In order to fuse multi-view contrastive depth features, we formulate an attention module by adapting multi-head attention mechanism originally designed for sequence to sequence machine translation using transformer (encoder-decoder) architecture~\cite{vaswani2017attention}.
-% \rakesh{Transformer architecture was proposed in multi-head attention paper, it doesn't need a separate citation}
-In a transformer architecture the encoder hidden state is mapped to lower dimension key-value pairs (\textbf{K}, \textbf{V})
-while the decoder hidden state is mapped to a query vector \textbf{Q} using independent fully connected layers.
-The encoder hidden state in our case is the multi-view features while the decoder hidden state is the \emph{mean} of the multi-view features.
-The attention weights are computed using scaled-dot product:
-\begin{equation}
-    Attention(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = softmax(\frac{\mathbf{Q} \mathbf{K}^{T}}{\sqrt{N}}) \mathbf{V}
-    \label{equ:attention}
-\end{equation}
-\noindent where $N$ is the number of input views.
-
-Multiple attention \emph{heads} are used which are concatenated and transformed to obtain the final output
-\begin{align}
-    head_i = Attention(\mathbf{Q} \mathbf{W}^{Q}_{i}, \mathbf{K} \mathbf{W}^{K}_{i}, \mathbf{V} \mathbf{W}^{V}_{i}) \label{equ:attention_head} \\
-    MultiHead(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = [head_1; ...; head_h] \mathbf{W}^0 \label{equ:multihead_attention}
-\end{align}
-
-\noindent where multiple $\mathbf{W}$ are parameters to be learned,
-$h$ is the number of attention heads and $i\in[1,h]$.
-
-% We refer our readers to~\cite{vaswani2017attention} for further technical details.
-
 We choose multi-head attention as our feature pooling method since it allows the model to attend information from different representation subspaces of the features by training multiple attentions in parallel.
 This method is also invariant to the order and number of input views.
 We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
+
+% \rakesh{Transformer architecture was proposed in multi-head attention paper, it doesn't need a separate citation}
+% In a transformer architecture the encoder hidden state is mapped to lower dimension key-value pairs (\textbf{K}, \textbf{V})
+% while the decoder hidden state is mapped to a query vector \textbf{Q} using independent fully connected layers.
+% The encoder hidden state in our case is the multi-view features while the decoder hidden state is the mean of the multi-view features.
+% The attention weights are computed using scaled-dot product:
+% \begin{equation}
+%     Attention(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = softmax(\frac{\mathbf{Q} \mathbf{K}^{T}}{\sqrt{N}}) \mathbf{V}
+%     \label{equ:attention}
+% \end{equation}
+% \noindent where $N$ is the number of input views.
+
+% Multiple attention heads are used which are concatenated and transformed to obtain the final output
+% \begin{align}
+%     head_i = Attention(\mathbf{Q} \mathbf{W}^{Q}_{i}, \mathbf{K} \mathbf{W}^{K}_{i}, \mathbf{V} \mathbf{W}^{V}_{i}) \label{equ:attention_head} \\
+%     MultiHead(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = [head_1; ...; head_h] \mathbf{W}^0 \label{equ:multihead_attention}
+% \end{align}
+
+% \noindent where multiple $\mathbf{W}$ are parameters to be learned,
+% $h$ is the number of attention heads and $i\in[1,h]$.
+
+% We refer our readers to~\cite{vaswani2017attention} for further technical details.
+
+
 % instead of other forms of attention (e.g.~\cite{chorowski2015attention,luong2015effective}) because
 
 
@@ -159,39 +171,76 @@ We visualize the learned attention weights (average of each attention heads) in~
 % For training the mesh generation, we use the loss terms from~\cite{wang2018pixel2mesh} along with new losses based on our formulation.
 
 \paragraph{Mesh losses}
-To constrain the mesh predicted by each GCN block (P) to resemble the ground truth (Q) we use
-Chamfer distance~\cite{fan2017point} between nearest neighbor mesh vertices $\Lambda$ i.e.
-$\mathcal{L}_{\text{chamfer}}(\text{P}, \text{Q}) = |\text{\text{P}}|^{-1} \sum_{(p, q) \in \Lambda_{\text{P},\text{Q}}}{||p-q||^{2}} + |\text{Q}|^{-1} \sum_{(q, p) \in \Lambda_{\text{Q},\text{P}}}{||q-p||^{2}}$ to learn to deform vertices to correct positions
-along with surface normal loss between vertex normal~\cite{wang2018pixel2mesh}
-$\mathcal{L}_{\text{normal}}(\text{P}, \text{Q}) = -|\text{P}|^{-1} \sum_{(p, q) \in \Lambda_{\text{P},\text{Q}}}{|u_p \cdot u_q|} - |\text{Q}|^{-1} \sum_{(q, p) \in \Lambda_{\text{Q},\text{P}}}{|u_q \cdot u_p|}$ to learn local higher order surface properties.
-Additional regularization in the form of edge length loss
-$\mathcal{L}_{\text{edge}}(\text{V}, \text{E}) = \frac{1}{|E|} \sum_{(v,v') \in E}{||v - v'||^2}$
-is also applied
-which penalizes long edges resulting in flying vertices~\cite{wang2018pixel2mesh} for visually appealing results.
+To constrain the mesh predicted by each GCN block $P$ to resemble the ground truth $Q$, we use three mesh loss functions the same as~\cite{wang2018pixel2mesh}.
+The first loss measures the Chamfer distance~\cite{fan2017point} between the nearest neighbor mesh vertices $\Lambda$, and deforms vertices to correct positions. 
+It is defined as:
+
+\begin{footnotesize}
+\begin{equation}
+\mathcal{L}_{\text{chamfer}}(P, Q) = |P|^{-1} \!\!\!\!\!\!\!\!\sum_{(p, q) \in \Lambda_{P,Q}}\!\!\!\!\!\!\!\!{||p-q||^{2}} + |Q|^{-1} \!\!\!\!\!\!\!\!\sum_{(q, p) \in \Lambda_{Q,P}}\!\!\!\!\!\!\!\!{||q-p||^{2}},
+\end{equation}
+\end{footnotesize}
+
+\noindent Furthermore, to encode the local higher order surface properties, the normal loss function is defined as:
+
+\begin{footnotesize}
+\begin{equation}
+\mathcal{L}_{\text{normal}}(P, Q) = -|P|^{-1}\!\!\!\!\!\!\!\! \sum_{(p, q) \in \Lambda_{P,Q}}\!\!\!\!\!\!\!\!{|u_p \cdot u_q|} - |Q|^{-1}\!\!\!\!\!\!\!\! \sum_{(q, p) \in \Lambda_{Q,P}}\!\!\!\!\!\!\!\!{|u_q \cdot u_p|},
+\end{equation}
+\end{footnotesize}
+
+\noindent where $u_p$ and $u_q$ represent the normals of vertices $p$ and $q$ respectively.  
+
+An additional regularization term in the form of edge length loss is also applied which penalizes long edges resulting in flying vertices~\cite{wang2018pixel2mesh} for visually appealing results. This loss function is defined as:
+
+\begin{equation}
+\mathcal{L}_{\text{edge}}(V, E) = \frac{1}{|E|} \sum_{(v,v') \in E}{||v - v'||^2},
+\end{equation}
+
+\noindent where $E$ denotes the set of graph edges.
+
 % \cite{wen2019pixel2mesh++} report improved performance when using Chamfer distance loss where the predicted mesh is re-sampled to obtain a point cloud with larger number of points.
 % We do not observe such improvements (the performance is even worse).
 % Note that~\cite{wen2019pixel2mesh++} uses mesh generated by Pixel2Mesh~\cite{wang2018pixel2mesh} as input and further refines it while our predictions are obtained without such initialization which might explain this difference.
 % Nonetheless, for evaluation we use re-sampled Chamfer distance for a fair comparison.
 
-\paragraph{Depth loss}\vspace{-4mm}
-Our depth prediction network is supervised using adaptive reversed Huber loss (also known as BerHu criterion)~\cite{lambert2016adaptiveberhu}.
-% This loss has been used for depth prediction in previous work such as~\cite{tang2018ba,laina2016deeper}.
-$\mathcal{L}_{depth} = |x|, & \text{if}\ |x| \le c \text{, otherwise } \frac{x^2 + c^2}{2c}$ where $x$ is the depth error of a pixel and $c$ is a constant set to $0.2$.
-Note that the original MVSNet uses L1-loss, but we used BerHu loss since it gave slightly higher accuracy.
-Intuitively, this is because BerHu provides a good balance between L1 and L2 loss and has shown similar improvement in~\cite{laina2016deeper}.
+\paragraph{Multi-view stereo depth loss}\vspace{-4mm}
+The original MVSNet~\cite{yao2018mvsnet} uses L1-loss, but this approach uses BerHu loss since it gives slightly higher accuracy.
+An intuitive explanation is that BerHu provides a good balance between L1 and L2 loss and a similar improvement is shown in the work~\cite{laina2016deeper} as well.
+Therefore, the multi-view stereo depth loss is defined as:
+
+\begin{equation}
+  \mathcal{L}_{depth}=\begin{cases}
+    |x|, & \text{if $|x| \le c$},\\
+    \frac{x^2 + c^2}{2c}, & \text{otherwise}.
+  \end{cases}
+\end{equation}
+
+\noindent Here, $x$ is the depth error of a pixel between the predicted and the ground-truth and $c=0.2$ is a constant.
 
 \paragraph{Contrastive depth loss}\vspace{-4mm}
 % The meshes predicted by different GCN blocks are differentiably rendered from the viewpoints of the predicted depth images and
-BerHu loss is also applied between the rendered depth images at different GCN stages and the predicted depth images
-which encourages the predicted mesh to conform to the predicted depths
-$\mathcal{L}_{contrastive} = |x|, & \text{if}\ |x| \le c \text{, otherwise } \frac{x^2 + c^2}{2c}$
+The BerHu loss is also applied to measure the difference between the rendered depth images at different GCN stages and the depth images from multi-view stereo.
+We denote the constrastive depth loss as $\mathcal{L}_{contrastive}$.
+Such a loss function encourages the predicted mesh to conform to the multi-view stereo depths.
+% \begin{equation}
+%   \mathcal{L}_{contrastive}=\begin{cases}
+%     |x|, & \text{if $|x| \le c$},\\
+%     \frac{x^2 + c^2}{2c}, & \text{otherwise}.
+%   \end{cases}
+% \end{equation}
 
-\paragraph{Voxel loss}\vspace{-4mm}
-Binary cross-entropy loss between the predicted voxel occupancy probabilities and the ground truth occupancy is used as voxel loss to supervise the voxel predictions to constrain the coarse initial shapes~\cite{gkioxari2019meshrcnn}
+\paragraph{Voxel occupancy loss}\vspace{-4mm}
+We introduce the voxel occupancy loss which measures the cross-entropy loss between the predicted voxel occupancy probabilities and the ground truth occupancy.
+Such a loss is used to supervise the voxel predictions and further constrain the coarse initial shapes~\cite{gkioxari2019meshrcnn}.
 % Voxel loss is introduced for the final probabilistically merged voxel grid as well as the voxel grids of individual views.
-$\mathcal{L}_{\text{voxel}} = -{\Big(p(x) log\big(p(x)\big) + \big(1 - p(x)\big)log\big(1 - p(x)\big)\Big)}$
+It is defined as:
+\begin{small}
+\begin{equation}
+\mathcal{L}_{\text{voxel}} = -{\Big(p(x) log\big(p(x)\big) + \big(1 - p(x)\big)log\big(1 - p(x)\big)\Big)}
+\end{equation}
+\end{small}
 
-\paragraph{Final loss}\vspace{-4mm}
-We use the weighted sum of the individual losses discussed above as the final loss to train our model in an end-to-end fashion.
-$\mathcal{L} = \lambda_{\text{chamfer}}\mathcal{L}_{\text{chamfer}} + \lambda_{\text{normal}}\mathcal{L}_{\text{normal}} + \lambda_{\text{edge}}\mathcal{L}_{\text{edge}} + \lambda_{\text{depth}}\mathcal{L}_{\text{depth}} + \lambda_{\text{contrastive}}\mathcal{L}_{\text{contrastive}} + \lambda_{\text{voxel}}\mathcal{L}_{\text{voxel}}$
-, where $\mathcal{L}$ is the final loss term.
+Finally, we use the weighted sum of the individual losses discussed above as the final loss and train our model in an end-to-end fashion.
+The final loss term $\mathcal{L}$ is defined as:
+$\mathcal{L} = \lambda_{\text{chamfer}}\mathcal{L}_{\text{chamfer}} + \lambda_{\text{normal}}\mathcal{L}_{\text{normal}} + \lambda_{\text{edge}}\mathcal{L}_{\text{edge}} + \lambda_{\text{depth}}\mathcal{L}_{\text{depth}} + \lambda_{\text{contrastive}}\mathcal{L}_{\text{contrastive}} + \lambda_{\text{voxel}}\mathcal{L}_{\text{voxel}}$.

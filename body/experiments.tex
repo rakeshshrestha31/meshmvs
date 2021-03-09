@@ -25,7 +25,7 @@ The state-of-the-art method is Pixel2Mesh++~\cite{wen2019pixel2mesh++} (referred
 % Also, \emph{Ours-P2M} uses the same architecture for the mesh deformations as \emph{MVP2M}. Hence, the changes in performance can be directly attributed to our depth based features, added geometric constraints and attentive feature pooling.
 Results from additional multi-view shape generation baselines 3D-R2N2~\cite{3dr2n2} and LSM~\cite{kar2017lsm} are also reported.
 
-\paragraph{Dataset}
+\paragraph{Dataset}\vspace{-4mm}
 We evaluate our method against the state-of-the-art methods on the dataset from~\cite{3dr2n2}
 which is a subset of ShapeNet~\cite{chang2015shapenet} and has been widely used by recent 3D shape generation methods.
 It contains 50K 3D CAD models from 13 categories.
@@ -34,7 +34,7 @@ The corresponding camera intrinsics and extrinsics are provided in the dataset.
 Since the dataset does not contain depth images, we render them using a custom depth renderer at the same viewpoints as the color images and with the same camera intrinsics.
 We follow the training/testing/validation split of~\cite{gkioxari2019meshrcnn}.
 
-\paragraph{Implementation}
+\paragraph{Implementation}\vspace{-4mm}
 % We train the proposed model using the same settings as Pixel2Mesh++ and MVP2M for fair comparison.
 % The same 3 views from each model are used as input and the images are resized to a resolution of 224$\times$224 for feature extraction/depth prediction.
 For the depth prediction module, we follow the original MVSNet~\cite{yao2018mvsnet} implementation.
@@ -52,7 +52,10 @@ Two settings of $\lambda_{\text{edge}}$ were used, $\lambda_{\text{edge}}=0$ (re
 
 % Ours models are implemented in PyTorch deep learning framework using open-source Pixel2Mesh/Mesh R-CNN implementation.
 
-\paragraph{Training and Runtime}
+% \siyu{Unlike~\cite{yao2018mvsnet}, we do not apply input image view selection and use the input views from~\cite{3dr2n2,wen2019pixel2mesh++} for fair comparison.
+% }
+
+\paragraph{Training and Runtime}\vspace{-4mm}
 The network is optimized using Adam optimizer with a learning rate of $10^{-4}$.
 The training is done on 5 Nvidia RTX-2080 GPUs with effective batch size 5.
 % The number of GPUs and batch size were chosen in order to maximize training speed while staying within the GPU memory limit.
@@ -64,7 +67,7 @@ Our system is implemented in PyTorch deep learning framework and it takes around
 % \emph{Ours-P2M} takes around 100 hours to train while \emph{Ours-MRCNN} takes around 50 hours.
 % This training time is similar to Pixel2Mesh++.
 
-\paragraph{Evaluation Metric}
+\paragraph{Evaluation Metric}\vspace{-4mm}
 Following~\cite{wang2018pixel2mesh, wen2019pixel2mesh++}, we use F1-score as our evaluation metric.
 The F1-score is the harmonic mean of precision and recall where the precision/recall are calculated by finding the percentage of points in the predicted/ground truth that can find a nearest neighbor from the other within a threshold.
 We provide evaluations with two threshold values: $\tau$ and $2\tau$ where $\tau=10^{-4}$  m$^2$.
@@ -104,7 +107,7 @@ The quantitative results are summarized in Table~\ref{table:contrastive_feature_
 % remains more details depth information and our Contrastive Depth Feature Extraction is able to encode the difference between the predicted depth map and rendered depth map from each deformation stage.
 
 \input{tables/contrastive_feature.tex}
-\paragraph{Accuracy with different settings}
+\paragraph{Accuracy with different settings}\vspace{-4mm}
 \tableref{ablation_study} shows the contribution of different components towards the final accuracy. Naively extending the single-view Mesh R-CNN~\cite{gkioxari2019meshrcnn} to multiple views using statistical feature pooling~\cite{wen2019pixel2mesh++} for mesh refinement (row 1) gives an F1-score of 72.74\% for threshold $\tau$ which is 6.26\% improvement over Pixel2Mesh++.
 We further extend the above method with our probabilistic multi-view voxel grid prediction in row 2 and get a 4.23\% improvement.
 
@@ -132,7 +135,7 @@ In row 6 we use ground truth instead of predicted depths on our final model whic
 
 % \input{tables/input_modalities.tex}
 
-\paragraph{Number of View}
+\paragraph{Number of Views}\vspace{-4mm}
 We test the performance of our framework with respect to the number of views.
 \tableref{number_of_input_views} shows that the accuracy of our method increases as we increase the number of input views for training.
 These experiments also validate that the attention-based feature pooling can efficiently encode features from different views to take advantage of larger number of views.
