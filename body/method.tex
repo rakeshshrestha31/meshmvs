@@ -106,7 +106,7 @@ Given the 2D feature maps, the feature vector of each graph node can be obtained
 % Along with the contrastive depth features, we also use the RGB features from ResNet calculated for voxel branch as input for mesh deformation as well.
 
 \paragraph{Attention-based Multi-View Feature Pooling}\vspace{-4mm}
-In order to fuse multi-view contrastive depth features, we formulate an attention module by adapting multi-head attention mechanism originally designed for sequence to sequence machine translation using transformer (encoder-decoder) architecture~\cite{vaswani2017attention}.
+In order to fuse multi-view contrastive depth features, we formulate an attention module by adapting multi-head attention mechanism originally designed for sequence to sequence machine translation using transformer architecture~\cite{vaswani2017attention}.
 We choose multi-head attention as our feature pooling method since it allows the model to attend information from different representation subspaces of the features by training multiple attentions in parallel.
 This method is also invariant to the order and number of input views.
 
