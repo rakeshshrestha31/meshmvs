@@ -36,3 +36,17 @@ We conduct experiments to evaluate the generalization capability of our system a
 \input{tables/generalization.tex}
 % \rakesh{We can also perform similar experiments where only one category is used for training, and we test the generalization to other 12 categories}
 
+\paragraph{Attention Weights visualization}
+We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=\linewidth]{imgs/attention_weights_visualization.png}
+\end{center}
+    \caption{
+        \textbf{Attention weights visualization.}
+        From left to right: input images from 3 viewpoints, corresponding ground truth point clouds color-coded by their view order and the predicted mesh vertices color-coded by the attention weights of the views.
+        Only the view with maximum attention weight is visualized for each predicted points for clarity.
+    }
+\label{fig:attention_weights}
+\end{figure*}
+

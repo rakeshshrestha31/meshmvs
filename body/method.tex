@@ -105,23 +105,10 @@ Given the 2D feature maps, the feature vector of each graph node can be obtained
 % Multiple methods for augmenting the two depths were tried among which using concatenated rendered and predicted depth as input for depth feature extraction gave the best result.
 % Along with the contrastive depth features, we also use the RGB features from ResNet calculated for voxel branch as input for mesh deformation as well.
 
-\begin{figure*}[t]
-\begin{center}
-\includegraphics[width=\linewidth]{imgs/attention_weights_visualization.png}
-\end{center}
-    \caption{
-        \textbf{Attention weights visualization.}
-        From left to right: input images from 3 viewpoints, corresponding ground truth point clouds color-coded by their view order and the predicted mesh vertices color-coded by the attention weights of the views.
-        Only the view with maximum attention weight is visualized for each predicted points for clarity.
-    }
-\label{fig:attention_weights}
-\end{figure*}
-
 \paragraph{Attention-based Multi-View Feature Pooling}\vspace{-4mm}
 In order to fuse multi-view contrastive depth features, we formulate an attention module by adapting multi-head attention mechanism originally designed for sequence to sequence machine translation using transformer (encoder-decoder) architecture~\cite{vaswani2017attention}.
 We choose multi-head attention as our feature pooling method since it allows the model to attend information from different representation subspaces of the features by training multiple attentions in parallel.
 This method is also invariant to the order and number of input views.
-We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
 
 % \rakesh{Transformer architecture was proposed in multi-head attention paper, it doesn't need a separate citation}
 % In a transformer architecture the encoder hidden state is mapped to lower dimension key-value pairs (\textbf{K}, \textbf{V})
