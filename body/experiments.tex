@@ -95,18 +95,7 @@ We also provide visual results for qualitative assessment of the generated shape
 % Similarly, "simple attention" baseline is obtained by replacing our feature pooling with feature fusion technique proposed in~\cite{hu2019randla,yang2020robust} where the pooled features are weighted sum of the multi-view features.
 % We can see that our rendered depth loss, contrastive depth input and attention-based feature pooling individually improve the accuracy of the predicted mesh.
 
-\paragraph{Contrastive Depth Feature Extraction}
-We evaluate several methods for contrastive feature extraction (\subsecref{contrastive_depth_feature_extraction}). These methods are
-1) \emph{Input Concatenation}: using the concatenated rendered and predicted depth maps as input to the VGG feature extractor,
-2) \emph{Input Difference}: using the difference of the two depth maps as input to VGG,
-3) \emph{Feature Concatenation}: concatenating features from rendered and predicted depths extracted by shared VGG,
-4) \emph{Feature Difference}: using difference of the features from the two depth maps extracted by shared VGG, and
-5) \emph{Predicted depth only}: using the VGG features from the predicted depths only.
-6) \emph{Rendered depth only}: using the VGG features from the rendered depths only.
-The quantitative results are summarized in Table~\ref{table:contrastive_feature_extraction} and shows that \emph{Input Concatenation} method produces better results than other formulations.
-% remains more details depth information and our Contrastive Depth Feature Extraction is able to encode the difference between the predicted depth map and rendered depth map from each deformation stage.
-
-\input{tables/contrastive_feature.tex}
+\input{tables/ablation_study.tex}
 \paragraph{Accuracy with different settings}\vspace{-4mm}
 \tableref{ablation_study} shows the contribution of different components towards the final accuracy. Naively extending the single-view Mesh R-CNN~\cite{gkioxari2019meshrcnn} to multiple views using statistical feature pooling~\cite{wen2019pixel2mesh++} for mesh refinement (row 1) gives an F1-score of 72.74\% for threshold $\tau$ which is 6.26\% improvement over Pixel2Mesh++.
 We further extend the above method with our probabilistic multi-view voxel grid prediction in row 2 and get a 4.23\% improvement.
@@ -120,7 +109,18 @@ In row 6 we use ground truth instead of predicted depths on our final model whic
 % \paragraph{Sphere initialization}
 % Row 8 uses a sphere as the coarse shape instead of cubified voxel grid.
 
-\input{tables/ablation_study.tex}
+\paragraph{Contrastive Depth Feature Extraction}\vspace{-4mm}
+We evaluate several methods for contrastive feature extraction (\subsecref{contrastive_depth_feature_extraction}). These methods are
+1) \emph{Input Concatenation}: using the concatenated rendered and predicted depth maps as input to the VGG feature extractor,
+2) \emph{Input Difference}: using the difference of the two depth maps as input to VGG,
+3) \emph{Feature Concatenation}: concatenating features from rendered and predicted depths extracted by shared VGG,
+4) \emph{Feature Difference}: using difference of the features from the two depth maps extracted by shared VGG, and
+5) \emph{Predicted depth only}: using the VGG features from the predicted depths only.
+6) \emph{Rendered depth only}: using the VGG features from the rendered depths only.
+The quantitative results are summarized in Table~\ref{table:contrastive_feature_extraction} and shows that \emph{Input Concatenation} method produces better results than other formulations.
+% remains more details depth information and our Contrastive Depth Feature Extraction is able to encode the difference between the predicted depth map and rendered depth map from each deformation stage.
+
+\input{tables/contrastive_feature.tex}
 
 % using the difference
 % Instead of using contrastive depth input i.e. concatenated predicted and rendered depths
