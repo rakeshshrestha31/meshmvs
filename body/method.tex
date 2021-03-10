@@ -39,12 +39,23 @@ Bayesian update on the probabilities reduce to simple summation of log likelihoo
 \noindent where $l_i$ is the voxel's log-odds in view $i$ and $n$ is the number of input views.
 The final voxel probability $x$ is obtained by applying the inverse function of \equref{logodds} which is a sigmoid function.
 % The final probability of the voxel $x$ can be obtained by applying the inverse function of \equref{logodds} which is a sigmoid function.
+\figref{initial_vox} shows the voxel grid predictions at each viewpoint along with the merged grid.
+
 \siyu{Provide some intermediate visual results of merged occupancy grid and cubified meshes.}
+\rakesh{\figref{initial_vox} added}
+\begin{figure}[th!]
+    \begin{center}
+        \includegraphics[width=\linewidth]{imgs/initial_vox.png}
+    \end{center}
+        \caption{Voxel grid prediction of individual views along with probabilistically merged grid. The merged grid can take into account the visibility limitations in single view predictions and produce better quality initial shape.}
+        \label{fig:initial_vox}
+\end{figure}
 
 \subsection{Mesh Refinement}
 \label{subsec:mesh_refinement}
 The cubified mesh from the voxel branch only provides a coarse reconstruction of the object's surface. 
 We then apply the graph convolutional network in which the mesh vertex and edges are represented by the graph nodes and edges respectively, to deform the mesh to more accurate positions based on the RGB and contrastive depth features.\siyu{In the experimental section, provide some intermediate results of meshes after different iterations of GCN refinement.}
+\rakesh{\figref{gcn_stages} and~\tableref{gcn_stages} added}
 
 \label{subsec:depth_prediction}
 \paragraph{Multi-View Depth Estimation}\vspace{-4mm}
