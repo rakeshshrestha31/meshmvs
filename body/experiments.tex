@@ -153,3 +153,15 @@ which indicates that increasing the number of views during testing does not impr
 % The accuracy is very close to the corresponding models trained with higher number of views indicating our model can learn with fewer number of views and generalize to a larger number.
 % -> \rakesh{this conclusion is not true, training with larger number of views gets significantly better performance}
 \input{tables/number_of_input_views.tex}
+
+\paragraph{Accuracy at Different GCN Stages}\vspace{-2mm}
+We analyze the accuracy of meshes at different GCN stages in~\tableref{gcn_stages} and~\figref{gcn_stages}. The results validate that our method produces the meshes in a coarse-to-fine manner and multiple GCN refinements improve the mesh quality.
+\input{tables/gcn_stages.tex}
+
+\begin{figure}[th!]
+    \begin{center}
+        \includegraphics[width=\linewidth]{imgs/gcn_stages.png}
+    \end{center}
+        \caption{Predicted shapes at different stages in the pipeline.}
+        \label{fig:gcn_stages}
+\end{figure}
