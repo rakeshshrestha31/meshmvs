@@ -102,7 +102,7 @@ We further extend the above method with our probabilistic multi-view voxel grid 
 
 In row 3 of~\tableref{ablation_study} we use our contrastive depth features instead of RGB features for mesh refinement and get 2.7\% improvement.
 We then replace the statistical feature pooling with the proposed attention method and get 0.19\% improvement.
-The improvement is not significant on our final architecture but we found the multi-head attention to perform better on more light-weight architectures.
+The improvement is not significant on our final architecture but we found the attention to perform better on more light-weight architectures and since it leads to lower memory consumption than statistical feature pooling, we decide to keep it.
 We also evaluate the effect of using additional regularization from contrastive depth losses: rendered depth vs predicted depth in the 5th rows of which improves the score by 0.98\%.
 In row 6 we use ground truth instead of predicted depths on our final model which gives the upper bound on our mesh prediction accuracy in relation to the depth prediction accuracy as 84.58\%.
 

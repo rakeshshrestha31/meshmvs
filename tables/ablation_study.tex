@@ -27,7 +27,7 @@
 (1) Naive multi-view Mesh R-CNN \qquad \qquad  \qquad  \qquad  \qquad & 72.74 & 84.99 \\
 (2) + Multi-view voxel grid prediction & 76.97 & 88.24 \\
 (3) + Contrastive depth input             & 79.63 & 90.10 \\
-(4) + Multi-head attention pooling   & 79.82    & 90.18  \\
+(4) + Attention pooling   & 79.82    & 90.18  \\
 (5) \bf{+ Contrastive depth loss (final model)}  & \textbf{80.80} & \textbf{90.72}\\
 % (6) Baseline + rendered vs GT depth loss    & 80.35 & 90.55 \\
 % (7) Baseline + rendered vs predicted depth loss + rendered vs GT depth loss    & 80.45 & 90.56 \\
@@ -39,8 +39,7 @@
 \end{center}
 \vspace{-4mm}
 \caption{
-    \textbf{Comparison of shape generation accuracy with different settings} of additional contrastive depth losses, multi-view feature pooling.
-    The Baseline framework uses multi-head attention mechanism without any contrastive depth losses.}
+    \textbf{Comparison of shape generation accuracy with different settings} of additional contrastive depth losses, multi-view voxel grid prediction and feature pooling.}
 \label{table:ablation_study}
 \end{table}
 
