@@ -1,0 +1,22 @@
+\begin{table}[ht]
+% \captionsetup{font=footnotesize,labelfont=footnotesize}
+\begin{center}
+\footnotesize
+\begin{tabular}{ l c c }
+\toprule[1pt]
+ &F1-$\tau$ &F1-2$\tau$   \\ \hline
+(1) P2M++ & 66.48 & 80.30 \\
+(2) Sphere initialization & 73.78 & 85.49 \\
+(3) Back-projected predicted depth initialization & 75.62 & 86.53 \\
+% (3) + Multi-view voxel grid prediction & 76.97 & 88.24 \\
+% this does not use contrastive depth features/loss and attention pooling, so is inconsistent with others
+(4) \bf{Proposed model}  & \textbf{80.80} & \textbf{90.72}\\
+\bottomrule[1pt]
+\end{tabular}
+\end{center}
+\vspace{-4mm}
+\caption{
+    \textbf{Comparison of shape generation accuracy with different initial shapes}: sphere, back-projected depth and the proposed model (CNN-based multi-view voxel grid prediction)}
+\label{table:initial_shape}
+\end{table}
+

@@ -106,8 +106,16 @@ The improvement is not significant on our final architecture but we found the mu
 We also evaluate the effect of using additional regularization from contrastive depth losses: rendered depth vs predicted depth in the 5th rows of which improves the score by 0.98\%.
 In row 6 we use ground truth instead of predicted depths on our final model which gives the upper bound on our mesh prediction accuracy in relation to the depth prediction accuracy as 84.58\%.
 
-% \paragraph{Sphere initialization}
-% Row 8 uses a sphere as the coarse shape instead of cubified voxel grid.
+\input{tables/initial_shape.tex}
+\paragraph{Initial Shape}\vspace{-4mm}
+\tableref{initial_shape} shows the F1-scores when using different methods for generating initial shapes for GCN refinement.
+All the methods (except P2M++) use contrastive depth features and loss along with attention-based feature pooling.
+When a unit level-4 ico-sphere is used as the initial shape (row 2), the score is F1-$\tau$ 73.78\%.
+Using back-projected predicted depth maps as initial shape (row 3), the scores increases to 75.62\%.
+Here, the back-projected points are transformed to 48 $\times$ 48 $\times$ 48 voxel grid.
+This can be done differentiably and efficiently using GPU-based chamfer distance calculation to determine the occupancy of each voxel.
+The proposed model which uses CNN-based voxel grid prediction (row 4) has the highest score of 80.8\%.
+The difference in score when using back-projected depth vs CNN predicted shape is due to the incomplete shapes the predicted depth give due to occlusion along with depth error due to arbitrary baseline between input images which is challenging to MVSNet depth predictor.
 
 \paragraph{Contrastive Depth Feature Extraction}\vspace{-4mm}
 We evaluate several methods for contrastive feature extraction (\subsecref{contrastive_depth_feature_extraction}). These methods are
