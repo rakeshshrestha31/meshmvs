@@ -96,7 +96,7 @@ We also provide visual results for qualitative assessment of the generated shape
 % We can see that our rendered depth loss, contrastive depth input and attention-based feature pooling individually improve the accuracy of the predicted mesh.
 
 \input{tables/ablation_study.tex}
-\paragraph{Accuracy with different settings}\vspace{-4mm}
+\paragraph{Accuracy with different settings}
 \tableref{ablation_study} shows the contribution of different components towards the final accuracy. Naively extending the single-view Mesh R-CNN~\cite{gkioxari2019meshrcnn} to multiple views using statistical feature pooling~\cite{wen2019pixel2mesh++} for mesh refinement (row 1) gives an F1-score of 72.74\% for threshold $\tau$ which is 6.26\% improvement over Pixel2Mesh++.
 We further extend the above method with our probabilistic multi-view voxel grid prediction in row 2 and get a 4.23\% improvement.
 
@@ -146,7 +146,7 @@ The quantitative results are summarized in Table~\ref{table:contrastive_feature_
 \paragraph{Number of Views}\vspace{-4mm}
 We test the performance of our framework with respect to the number of views.
 \tableref{number_of_input_views} shows that the accuracy of our method increases as we increase the number of input views for training.
-These experiments also validate that the attention-based feature pooling can efficiently encode features from different views to take advantage of larger number of views.
+% These experiments also validate that the attention-based feature pooling can efficiently encode features from different views to take advantage of larger number of views.
 
 \tableref{number_of_test_views} shows the results when using different number of views during testing on our model trained with 3 views
 which indicates that increasing the number of views during testing does not improve the accuracy while decreasing the number of views can cause a significant drop in accuracy.
