@@ -165,3 +165,8 @@ We analyze the accuracy of meshes at different GCN stages in~\tableref{gcn_stage
         \caption{Predicted shapes at different stages in the pipeline.}
         \label{fig:gcn_stages}
 \end{figure}
+
+\vspace{-2mm}
+\paragraph{Generalization Capability}
+We conduct experiments to evaluate the generalization capability of our system across the semantic categories. We train our model with only 12 out of the 13 categories and test on the category that was left out. \tableref{train_except_one_category} shows that the accuracy generally does not decrease significantly when compared with the model that was trained on all 13 categories when using $2\tau$ threshold for the F-score.
+\input{tables/generalization.tex}

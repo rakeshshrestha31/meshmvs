@@ -26,12 +26,6 @@ We observe that the mesh accuracy remain relatively unchanged if we predict dept
 % As can be seen in~\tableref{depth_resolution}, the performance of the model with different number of depth hypotheses are roughly the same. Note that the range of depth values for all the models are kept the same.
 \input{tables/depth_resolution.tex}
 
-\vspace{-2mm}
-\paragraph{Generalization Capability}
-We conduct experiments to evaluate the generalization capability of our system across the semantic categories. We train our model with only 12 out of the 13 categories and test on the category that was left out. \tableref{train_except_one_category} shows that the accuracy generally does not decrease significantly when compared with the model that was trained on all 13 categories when using $2\tau$ threshold for the F-score.
-\input{tables/generalization.tex}
-% \rakesh{We can also perform similar experiments where only one category is used for training, and we test the generalization to other 12 categories}
-
 \paragraph{Attention Weights visualization}
 We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
 \begin{figure*}[t]
