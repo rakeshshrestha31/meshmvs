@@ -59,7 +59,9 @@ We then apply the graph convolutional network in which the mesh vertex and edges
 
 \label{subsec:depth_prediction}
 \paragraph{Multi-View Depth Estimation}\vspace{-4mm}
-To obtain the depth image of each RGB image, we iteratively regard each view as the reference and apply the standard MVSNet~\cite{yao2018mvsnet}.
+We extend MVSNet~\cite{yao2018mvsnet} for multi-view depth prediction.
+To obtain the depth image of each RGB image, we predict feature volume for each image using shared CNN and iteratively warp the features to each view and apply cost volume regularization to predict the depths.
+\rakesh{To obtain the depth image of each RGB image, we iteratively regard each view as the reference and apply the standard MVSNet~\cite{yao2018mvsnet}. -> this is not exactly right. Doing this would be inefficient, feature volume is extracted only once and are shared for depth regression of each view}
 In implementation, we discard the policy of view selection, and set the number of depth hypothesis to $48$ which is equivalent to a resolution of $25$ mm.
 
 % We extend MVSNet~\cite{yao2018mvsnet} and predict the depth maps of all views since the original implementation predicts depth of only one reference view.
