@@ -39,7 +39,7 @@ Bayesian update on the probabilities reduce to simple summation of log likelihoo
 \noindent where $l_i$ is the voxel's log-odds in view $i$ and $n$ is the number of input views.
 The final voxel probability $x$ is obtained by applying the inverse function of \equref{logodds} which is a sigmoid function.
 % The final probability of the voxel $x$ can be obtained by applying the inverse function of \equref{logodds} which is a sigmoid function.
-\figref{initial_vox} shows the voxel grid predictions at each viewpoint along with the merged grid.
+\figref{initial_vox} shows the voxel grid predictions at each viewpoint along with the merged grid for two sets of input images.
 
 \siyu{Provide some intermediate visual results of merged occupancy grid and cubified meshes.}
 \rakesh{\figref{initial_vox} added}
@@ -47,7 +47,7 @@ The final voxel probability $x$ is obtained by applying the inverse function of 
     \begin{center}
         \includegraphics[width=\linewidth]{imgs/initial_vox.png}
     \end{center}
-        \caption{Voxel grid prediction of individual views along with probabilistically merged grid. The merged grid can take into account the visibility limitations in single view predictions and produce better quality initial shape.}
+        \caption{\textbf{Voxel grid prediction of individual views along with probabilistically merged grid}. The merged grid can take into account the visibility limitations in single view predictions and produce better quality initial shape.}
         \label{fig:initial_vox}
 \end{figure}
 
@@ -100,7 +100,7 @@ Here, $v_i$ and $v_i^{'}$ represent the vertex coordinates before and after each
         \label{fig:contrastive_feature_extractor}
 \end{figure}
 
-Inspired by the work~\cite{yao2020front2back} that incorporating intermediate and image-centric 2.5D representations instead of directly generating 3D shapes from only RGB images~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} can improve 3D reconstruction quality.
+We take inspiration from the work~\cite{yao2020front2back} that incorporates intermediate and image-centric 2.5D representations instead of directly generating 3D shapes from only RGB images~\cite{wang2018pixel2mesh,wen2019pixel2mesh++} to improve 3D reconstruction quality.
 As shown in Figure~\ref{fig:contrastive_feature_extractor}, we therefore propose to formulate the features of graph nodes using depth images as the additional inputs alongside with the RGB features.
 At a single viewpoint, we consider two sources of depth images, namely the rendered depth from the meshes at different GCN stages and the corresponding input depth from multi-view stereo.
 We apply the approach proposed in~\cite{kato2018renderer} for differentiable rendering.
@@ -207,7 +207,7 @@ An additional regularization term in the form of edge length loss is also applie
 \paragraph{Multi-view stereo depth loss}\vspace{-4mm}
 The original MVSNet~\cite{yao2018mvsnet} uses L1-loss, but this approach uses BerHu loss since it gives slightly higher accuracy.
 An intuitive explanation is that BerHu provides a good balance between L1 and L2 loss and a similar improvement is shown in the work~\cite{laina2016deeper} as well.
-Therefore, the multi-view stereo depth loss is defined as:
+The multi-view stereo depth loss is defined as:
 
 \begin{equation}
   \mathcal{L}_{depth}=\begin{cases}

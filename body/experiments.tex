@@ -78,7 +78,7 @@ We provide evaluations with two threshold values: $\tau$ and $2\tau$ where $\tau
 We quantitatively compare our method against previous works for multi-view shape generation in~\tableref{baseline_comparison} and show the effectiveness of our methods in improving the shape quality. Our method outperforms the state-of-the-art method  Pixel2Mesh++~\cite{wen2019pixel2mesh++} with
 a decrease in chamfer distance to ground truth by 34\% and 15\% increase in F1-score at threshold $\tau$.
 Note that in~\tableref{baseline_comparison} the same model is trained for all the categories but accuracy on individual categories as well as average over the categories are evaluated.
-We provide the chamfer distances in the appendix.
+We provide the chamfer distances in the supplementary material.
 \input{tables/baseline_comparison.tex}
 
 We also provide visual results for qualitative assessment of the generated shapes by our \emph{Pretty} model in~\figref{qualitative_evaluation} which shows that it is able to more accurately predict topologically diverse shapes.
@@ -112,10 +112,10 @@ In row 6 we use ground truth instead of predicted depths on our final model whic
 All the methods (except P2M++) use contrastive depth features and loss along with attention-based feature pooling.
 When a unit level-4 ico-sphere is used as the initial shape (row 2), the score is F1-$\tau$ 73.78\%.
 Using back-projected predicted depth maps as initial shape (row 3), the scores increases to 75.62\%.
-Here, the back-projected points are transformed to 48 $\times$ 48 $\times$ 48 voxel grid.
-This can be done differentiably and efficiently using GPU-based chamfer distance calculation to determine the occupancy of each voxel.
+Here, the back-projected points are transformed to 48 $\times$ 48 $\times$ 48 voxel grid
+which can be done differentiably and efficiently using GPU based k-nearest neighbor calculation to determine the occupancy of each voxel.
 The proposed model which uses CNN-based voxel grid prediction (row 4) has the highest score of 80.8\%.
-The difference in score when using back-projected depth vs CNN predicted shape is due to the incomplete shapes the predicted depth give due to occlusion along with depth error due to arbitrary baseline between input images which is challenging to MVSNet depth predictor.
+The difference in score when using back-projected depth vs CNN predicted shape is due to the incomplete shapes the predicted depth give due to occlusion along with depth error due to arbitrary baseline between input images which is challenging for MVSNet-based depth predictor.
 
 \paragraph{Contrastive Depth Feature Extraction}\vspace{-4mm}
 We evaluate several methods for contrastive feature extraction (\subsecref{contrastive_depth_feature_extraction}). These methods are
@@ -168,5 +168,5 @@ We analyze the accuracy of meshes at different GCN stages in~\tableref{gcn_stage
 
 \vspace{-2mm}
 \paragraph{Generalization Capability}
-We conduct experiments to evaluate the generalization capability of our system across the semantic categories. We train our model with only 12 out of the 13 categories and test on the category that was left out. \tableref{train_except_one_category} shows that the accuracy generally does not decrease significantly when compared with the model that was trained on all 13 categories when using $2\tau$ threshold for the F-score.
+We conduct experiments to evaluate the generalization capability of our system across the semantic categories. We train our model with only 12 out of the 13 categories and test on the category that was left out. \tableref{train_except_one_category} shows that the accuracy generally does not decrease significantly when compared with the model that was trained on all 13 categories, especially when using $2\tau$ threshold for F-score.
 \input{tables/generalization.tex}
