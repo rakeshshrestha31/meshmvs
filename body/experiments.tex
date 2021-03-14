@@ -72,8 +72,9 @@ Following~\cite{wang2018pixel2mesh, wen2019pixel2mesh++}, we use F1-score as our
 The F1-score is the harmonic mean of precision and recall where the precision/recall are calculated by finding the percentage of points in the predicted/ground truth that can find a nearest neighbor from the other within a threshold.
 We provide evaluations with two threshold values: $\tau$ and $2\tau$ where $\tau=10^{-4}$  m$^2$.
 % (in terms of squared Euclidean distance).
-% The output meshes can vary in number of vertices but are re-sampled to 6466 points before evaluating the F1-score~\cite{wang2018pixel2mesh, wen2019pixel2mesh++}. \rakesh{might not be true}
+% The output meshes can vary in number of vertices but are re-sampled to 6466 points before evaluating the F1-score~\cite{wang2018pixel2mesh, wen2019pixel2mesh++}.
 
+\vspace{-1mm}
 \subsection{Comparison with previous Multi-view Shape Generation Methods}
 We quantitatively compare our method against previous works for multi-view shape generation in~\tableref{baseline_comparison} and show the effectiveness of our methods in improving the shape quality. Our method outperforms the state-of-the-art method  Pixel2Mesh++~\cite{wen2019pixel2mesh++} with
 a decrease in chamfer distance to ground truth by 34\% and 15\% increase in F1-score at threshold $\tau$.

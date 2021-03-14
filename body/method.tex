@@ -1,7 +1,7 @@
 \section{Methodology}
 \figref{system_architecture} shows the architecture of the proposed system which takes as input multi-view color images of an object with known poses and outputs a triangle mesh of the object $ T = (V, F) $ where $ V = \{ v_i \in \mathbb{R}^3\} $ is the set of vertex coordinates and $ F \subseteq V \times V \times V $ is the set of faces.
 The multi-view voxel grid prediction module (\subsecref{multiview_voxel}) first predicts a coarse voxel grid of the object.
-The voxel grid is converted to mesh representation by cubify operation which is further refined by the mesh refinement module (\subsecref{mesh_refinement}).
+The voxel grid is converted to mesh representation by cubify operation~\cite{gkioxari2019meshrcnn} which is further refined by the mesh refinement module (\subsecref{mesh_refinement}).
 A series of Graph Convolution Networks (GCN) deforms the cubified voxel grid to obtain surface mesh.
 The GCNs use multi-view contrastive depth features from concatenated predicted and rendered depth along with RGB features as input to deform the input mesh.
 Depth images are predicted using an extended MVSNet network~\cite{yao2018mvsnet}.
@@ -91,7 +91,7 @@ Here, $v_i$ and $v_i^{'}$ represent the vertex coordinates before and after each
     \begin{center}
         \includegraphics[width=0.8\linewidth]{imgs/contrastive_feature_extractor.png}
     \end{center}
-        \caption{Contrastive feature extraction. Rendered depths of the current shape along with the predicted depths for each view are concatenated and CNN feature extractor is applied. Then along with the RGB features, the multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
+        \caption{\textbf{Contrastive feature extraction}. We concatenate rendered depths and predicted depths and apply CNN feature extractor. The multi-view features are pooled using attentive feature pooling and used by GCN for deforming the shape}
         \label{fig:contrastive_feature_extractor}
 \end{figure}
 
@@ -236,6 +236,7 @@ It is defined as:
 \end{equation}
 \end{small}
 
+\vspace{-4mm}
 Finally, we use the weighted sum of the individual losses discussed above as the final loss and train our model in an end-to-end fashion.
 The final loss term $\mathcal{L}$ is defined as:
 $\mathcal{L} = \lambda_{\text{chamfer}}\mathcal{L}_{\text{chamfer}} + \lambda_{\text{normal}}\mathcal{L}_{\text{normal}} + \lambda_{\text{edge}}\mathcal{L}_{\text{edge}} + \lambda_{\text{depth}}\mathcal{L}_{\text{depth}} + \lambda_{\text{contrastive}}\mathcal{L}_{\text{contrastive}} + \lambda_{\text{voxel}}\mathcal{L}_{\text{voxel}}$.
