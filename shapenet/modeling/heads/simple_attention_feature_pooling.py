@@ -1,6 +1,3 @@
-##
-#  @author Rakesh Shrestha, rakeshs@sfu.ca
-
 import torch
 import torch.nn as nn
 
