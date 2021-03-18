@@ -1,9 +1,9 @@
 \documentclass[10pt,twocolumn,letterpaper]{article}
+\pdfoutput=1
 
 \usepackage{iccv}
 \usepackage{times}
 \usepackage{epsfig}
-\usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
 
@@ -24,13 +24,14 @@
 \usepackage{epsfig}
 \usepackage{verbatim}
 \usepackage{authorname}
+\usepackage{graphicx}
 
 % If you comment hyperref and then uncomment it, you should delete
 % egpaper.aux before re-running latex.  (Or just hit 'q' on the first latex
 % run, let it finish, and you should be clear).
 \usepackage[pagebackref=true,breaklinks=true,letterpaper=true,colorlinks,bookmarks=false]{hyperref}
 
-% \iccvfinalcopy % *** Uncomment this line for the final submission
+\iccvfinalcopy % *** Uncomment this line for the final submission
 
 \def\iccvPaperID{****} % *** Enter the ICCV Paper ID here
 \def\httilde{\mbox{\tt\raisebox{-.5ex}{\symbol{126}}}}
@@ -43,20 +44,12 @@
 %%%%%%%%% TITLE
 \title{MeshMVS: Multi-View Stereo Guided Mesh Reconstruction}
 
-\author{First Author\\
-Institution1\\
-Institution1 address\\
-{\tt\small firstauthor@i1.org}
-% For a paper whose authors are all at the same institution,
-% omit the following lines up until the closing ``}''.
-% Additional authors and addresses can be added with ``\and'',
-% just like the second author.
-% To save space, use either the email address or home page, not both
-\and
-Second Author\\
-Institution2\\
-First line of institution2 address\\
-{\tt\small secondauthor@i2.org}
+\author{
+    \small
+    Rakesh Shrestha$^{1}$, Zhiwen Fan$^{2}$, Siyu Zhu$^{2}$, Qingkun Su$^{2}$, Zuozhuo Dai$^{2}$, Ping Tan$^{1}$ \\
+    \normalsize{Simon Fraser University$^{1}$},
+    \normalsize{Alibaba A.I Labs$^{2}$} \\
+    \scriptsize{\{rakeshs,pingtan\}@sfu.ca, \{waynefan.fzw,siting.zsy,qingkun.sqk,zuozhuo.dzz\}@alibaba-inc.com}
 }
 
 \maketitle

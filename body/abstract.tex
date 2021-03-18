@@ -6,6 +6,7 @@
     Then the depth images from multi-view stereo along with the rendered depth images of the coarse shape are used as a contrastive input whose features guide the refinement of the coarse shape through a series of graph convolution networks.
     % Attention-based multi-view feature pooling is proposed to fuse the contrastive depth features from different viewpoints which are fed to the graph convolution networks.
     Notably, we achieve superior results than state-of-the-art multi-view shape generation methods with 34\% decrease in Chamfer distance to ground truth and 14\% increase in F1-score on ShapeNet dataset.
+    Our source code is available at \url{https://git.io/Jmalg}
 
     % Additional constrains between the rendered depths of the predicted shapes and the predicted depth maps are introduced to further regularize the shape generation process.
     % A series of graph convolution networks are applied to refine the shape in a coarse to fine manner all of which utilize contrastive depth input at the current stage of refinement.

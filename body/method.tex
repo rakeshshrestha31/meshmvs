@@ -12,8 +12,8 @@ The multi-view features are fused using attention mechanism.
 
 \paragraph{Single-view Voxel Grid Prediction}
 For each of the input single RGB image, we first generate the voxel occupancy grid of the target object.
-Specifically, the single-view voxel branch adopts the approach proposed in~\cite{gkioxari2019meshrcnn} which consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network. 
-Here, we set the resolution of the generated voxel occupancy grid as 48 $\times$ 48 $\times$ 48. 
+Specifically, the single-view voxel branch adopts the approach proposed in~\cite{gkioxari2019meshrcnn} which consists of a ResNet feature extractor and a fully convolutional voxel grid prediction network.
+Here, we set the resolution of the generated voxel occupancy grid as 48 $\times$ 48 $\times$ 48.
 The voxel prediction networks for all viewpoints share the same weights.
 % following Mesh R-CNN~\cite{gkioxari2019meshrcnn}.
 
@@ -51,7 +51,7 @@ The final voxel probability $x$ is obtained by applying the inverse function of 
 
 \subsection{Mesh Refinement}
 \label{subsec:mesh_refinement}
-The cubified mesh from the voxel branch only provides a coarse reconstruction of the object's surface. 
+The cubified mesh from the voxel branch only provides a coarse reconstruction of the object's surface.
 We then apply the graph convolutional network in which the mesh vertex and edges are represented by the graph nodes and edges respectively, to deform the mesh to more accurate positions based on the RGB and contrastive depth features.
 \label{subsec:depth_prediction}
 \paragraph{Multi-View Depth Estimation}\vspace{-4mm}
@@ -167,7 +167,7 @@ This method is also invariant to the order and number of input views.
 
 \paragraph{Mesh losses}
 To constrain the mesh predicted by each GCN block $P$ to resemble the ground truth $Q$, we use three mesh loss functions the same as~\cite{wang2018pixel2mesh}.
-The first loss measures the Chamfer distance~\cite{fan2017point} between the nearest neighbor mesh vertices $\Lambda$, and deforms vertices to correct positions. 
+The first loss measures the Chamfer distance~\cite{fan2017point} between the nearest neighbor mesh vertices $\Lambda$, and deforms vertices to correct positions.
 It is defined as:
 
 \begin{footnotesize}
@@ -184,7 +184,7 @@ It is defined as:
 \end{equation}
 \end{footnotesize}
 
-\noindent where $u_p$ and $u_q$ represent the normals of vertices $p$ and $q$ respectively.  
+\noindent where $u_p$ and $u_q$ represent the normals of vertices $p$ and $q$ respectively.
 
 An additional regularization term in the form of edge length loss is also applied which penalizes long edges resulting in flying vertices~\cite{wang2018pixel2mesh} for visually appealing results. This loss function is defined as:
 
