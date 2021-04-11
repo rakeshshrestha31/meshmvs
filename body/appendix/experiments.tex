@@ -1,4 +1,4 @@
-\section*{Experiments}
+\section{Experiments}
 
 We quantitatively compare our method against previous works for multi-view shape generation in~\tableref{baseline_comparison_cd} and show effectiveness of our proposed shape generation methods in improving shape quality. Our method outperforms the state-of-the-art method  Pixel2Mesh++~\cite{wen2019pixel2mesh++} with
 decrease in chamfer distance to ground truth by 34\%, which shows the effectiveness of our proposed method.
@@ -6,7 +6,7 @@ Note that in~\tableref{baseline_comparison_cd} same model is trained for all the
 
 \input{tables/baseline_comparison_chamfer_distance.tex}
 
-\subsection*{Ablation studies}
+\subsection{Ablation studies}
 
 \vspace{-2mm}
 \paragraph{Coarse Shape Generation}
@@ -25,18 +25,4 @@ We observe that the mesh accuracy remain relatively unchanged if we predict dept
 % We evaluate the performance at different number of depth hypothesis of the depth prediction model (\subsecref{depth_prediction} ).
 % As can be seen in~\tableref{depth_resolution}, the performance of the model with different number of depth hypotheses are roughly the same. Note that the range of depth values for all the models are kept the same.
 \input{tables/depth_resolution.tex}
-
-\paragraph{Attention Weights visualization}
-We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
-\begin{figure*}[t]
-\begin{center}
-\includegraphics[width=\linewidth]{imgs/attention_weights_visualization.png}
-\end{center}
-    \caption{
-        \textbf{Attention weights visualization.}
-        From left to right: input images from 3 viewpoints, corresponding ground truth point clouds color-coded by their view order and the predicted mesh vertices color-coded by the attention weights of the views.
-        Only the view with maximum attention weight is visualized for each predicted points for clarity.
-    }
-\label{fig:attention_weights}
-\end{figure*}
 

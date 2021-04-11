@@ -1,7 +1,21 @@
-\section*{Best vs Pretty models}
+\section{Attention Weights visualization}
+We visualize the learned attention weights (average of each attention heads) in~\figref{attention_weights} where we can observe that the attention weights roughly takes into account the visibility/occlusion information from each view.
+\begin{figure*}[t]
+\begin{center}
+\includegraphics[width=\linewidth]{imgs/attention_weights_visualization.png}
+\end{center}
+    \caption{
+        \textbf{Attention weights visualization.}
+        From left to right: input images from 3 viewpoints, corresponding ground truth point clouds color-coded by their view order and the predicted mesh vertices color-coded by the attention weights of the views.
+        Only the view with maximum attention weight is visualized for each predicted points for clarity.
+    }
+\label{fig:attention_weights}
+\end{figure*}
+
+\section{Best vs Pretty models}
 
 We provide qualitative comparison between the our models trained with \emph{best} and \emph{pretty} configurations in~\figref{best_vs_pretty}.
-The \emph{best} configuration refers to our model trained without edge regularization while \emph{pretty} refers to the model trained with the regularization (\subsecref{experimental_setup}).
+The \emph{best} configuration refers to our model trained without edge regularization while \emph{pretty} refers to the model trained with the regularization (Subsection 4.1 of the main submission).
 We observe that without the regularization we get higher score on our evaluation metrics but get degenerate meshes with self-intersections and irregularly sized faces.
 
 \begin{figure*}[h]
@@ -15,7 +29,7 @@ We observe that without the regularization we get higher score on our evaluation
 \end{figure*}
 
 \newpage
-\section*{Failure Cases}
+\section{Failure Cases}
 
 Some failure cases of our model (with pretty setting) are shown in~\figref{failure_cases}.
 % We notice that our system can still struggle with shapes with very complex topology.
