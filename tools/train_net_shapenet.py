@@ -559,8 +559,13 @@ def save_debug_predictions(batch, model_outputs):
 
     batch_size = len(batch["id_strs"])
     if model_outputs.get("voxel_scores", None) is not None:
-        for view_idx, voxels in enumerate(model_outputs["voxel_scores"]):
+        for view_idx, (voxels, transformed_voxels) in enumerate(zip(
+            model_outputs["voxel_scores"],
+            model_outputs["transformed_voxel_scores"]
+        )):
+            print('cubified view', view_idx)
             cubified = cubify(voxels, 48, 0.2)
+            cubified_transformed = cubify(transformed_voxels, 48, 0.2)
             for batch_idx in range(batch_size):
                 label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
                 save_obj(
@@ -570,6 +575,14 @@ def save_debug_predictions(batch, model_outputs):
                     cubified[batch_idx].verts_packed(),
                     cubified[batch_idx].faces_packed()
                 )
+                save_obj(
+                    "/tmp/{}_{}_{}_transformed_multiview_vox.obj".format(
+                        label, label_appendix, view_idx
+                    ),
+                    cubified_transformed[batch_idx].verts_packed(),
+                    cubified_transformed[batch_idx].faces_packed()
+                )
+        print('cubified merged')
         merged_voxels = cubify(model_outputs["merged_voxel_scores"], 48, 0.2)
         for batch_idx in range(batch_size):
             label, label_appendix = batch["id_strs"][batch_idx].split("-")[:2]
@@ -659,7 +672,9 @@ def save_debug_predictions(batch, model_outputs):
             masked_depths,
             "pred_{}_{}".format(label, label_appendix), (137, 137)
         )
-        save_backproj_depths(masked_depths, batch["id_strs"], "depth_cloud")
+        save_backproj_depths(
+            masked_depths, batch["id_strs"], batch["extrinsics"], "depth_cloud"
+        )
 
     if "rendered_depths" in model_outputs:
         # TODO: the labels won't be corrent when batch size > 1. Fix it
@@ -670,18 +685,21 @@ def save_debug_predictions(batch, model_outputs):
                 (137, 137)
             )
             save_backproj_depths(
-                depth, batch["id_strs"], "rendered_cloud_{}".format(stage_idx)
+                depth, batch["id_strs"], batch["extrinsics"],
+                "rendered_cloud_{}".format(stage_idx)
             )
 
 
 @torch.no_grad()
-def save_backproj_depths(depths, id_strs, prefix):
+def save_backproj_depths(depths, id_strs, extrinsics, prefix):
     depths = F.interpolate(depths, (224, 224))
     dtype = depths.dtype
     device = depths.device
     intrinsics = torch.tensor([
         [248.0, 0.0, 111.5], [0.0, 248.0, 111.5], [0.0, 0.0, 1.0]
     ], dtype=dtype, device=device)
+
+    rel_extrinsics  = relative_extrinsics(extrinsics, extrinsics[:, 0])
     depth_points = get_points_from_depths(depths, intrinsics)
 
     for batch_idx in range(len(depth_points)):
@@ -690,9 +708,18 @@ def save_backproj_depths(depths, id_strs, prefix):
             points = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
                 depth_points[batch_idx][view_idx].detach().cpu().numpy()
             ))
-            o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}.ply".format(
+            T_view_world = rel_extrinsics[batch_idx, view_idx] \
+                                .detach().cpu().numpy()
+            T_world_view = np.linalg.inv(T_view_world)
+            points_global = copy.deepcopy(points).transform(T_world_view)
+
+            o3d.io.write_point_cloud("/tmp/{}_local_{}_{}_{}.ply".format(
                 prefix, label, label_appendix, view_idx
             ), points)
+
+            o3d.io.write_point_cloud("/tmp/{}_global_{}_{}_{}.ply".format(
+                prefix, label, label_appendix, view_idx
+            ), points_global)
 
 
 def setup_loaders(cfg):
