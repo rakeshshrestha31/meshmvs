@@ -4,9 +4,12 @@ import numpy as np
 from collections import defaultdict
 import tqdm
 import os
+import cv2
 
 import detectron2.utils.comm as comm
 import torch
+import torch.nn.functional as F
+import torchvision
 from detectron2.evaluation import inference_context
 from pytorch3d.ops import sample_points_from_meshes
 
@@ -404,10 +407,15 @@ def evaluate_split_depth(
     if isinstance(model, torch.nn.parallel.DistributedDataParallel):
         model = model.module
 
+    deprocess = imagenet_deprocess(rescale_image=False)
+
     device = torch.device("cuda:0")
     num_predictions = 0
     num_predictions_kept = 0
     total_l1_err = 0.0
+    total_gt_depth = 0.0
+    min_gt_depth = np.inf
+    max_gt_depth = -np.inf
     num_pixels = 0.0
     predictions = defaultdict(list)
     metrics = defaultdict(list)
@@ -432,8 +440,12 @@ def evaluate_split_depth(
             batch["masks"], pred_depths.shape[-2:]
         )
         masked_pred_depths = pred_depths * mask
+
         total_l1_err += \
                 torch.sum(torch.abs(masked_pred_depths - depth_gt)).item()
+        total_gt_depth += torch.sum(torch.abs(depth_gt)).item()
+        min_gt_depth = min(min_gt_depth, torch.min(depth_gt[depth_gt > 1e-7]).item())
+        max_gt_depth = max(max_gt_depth, torch.max(depth_gt).item())
         num_pixels += torch.sum(mask).item()
         cur_metrics = {"depth_loss": loss, "negative_depth_loss": -loss}
 
@@ -441,6 +453,62 @@ def evaluate_split_depth(
             continue
         for k, v in cur_metrics.items():
             metrics[k].append(v)
+
+        # viz_image_size = (224, 224)
+        # viz_masks = interpolate_multi_view_tensor(
+        #     batch["masks"], viz_image_size
+        # ).detach().cpu()
+
+        # # debug: viz images
+        # def apply_colormap(tensor):
+        #     nonlocal viz_image_size
+
+        #     tensor = F.interpolate(
+        #         tensor.unsqueeze(0).unsqueeze(0),
+        #         viz_image_size, mode="nearest"
+        #     ).squeeze(0).squeeze(0)
+
+        #     nonzeros = (tensor > 1e-7).unsqueeze(0).expand(3, -1, -1) \
+        #                 .detach().cpu().float()
+
+        #     img = cv2.applyColorMap(
+        #         tensor.detach().cpu().mul(255).byte().numpy(),
+        #         cv2.COLORMAP_JET
+        #     )
+        #     tensor = torch.from_numpy(img).permute(2, 0, 1).float().div(255) \
+        #                 * nonzeros
+        #     tensor = torch.cat((tensor, nonzeros[0].unsqueeze(0)), dim=0)
+        #     return tensor
+
+        # for idx in range(3):
+        #     imgs = F.interpolate(
+        #         batch["imgs"][idx], viz_image_size, mode="bilinear"
+        #     ).detach().cpu()
+
+        #     imgs = [
+        #         torch.cat((deprocess(img), viz_masks[idx, i].unsqueeze(0)))
+        #         for i, img in enumerate(imgs.unbind(0))
+        #     ]
+
+        #     depth_gt_colored = [apply_colormap(i) for i in depth_gt[idx].unbind(0)]
+        #     depth_pred_colored = [
+        #         apply_colormap(i) for i in masked_pred_depths[idx].unbind(0)
+        #     ]
+
+        #     grid = torch.stack((
+        #         imgs[0], depth_gt_colored[0], depth_pred_colored[0],
+        #         imgs[1], depth_gt_colored[1], depth_pred_colored[1],
+        #         imgs[2], depth_gt_colored[2], depth_pred_colored[2],
+        #     ), dim=0)
+
+
+        #     torchvision.utils.save_image(
+        #         grid,
+        #         "/projects/mesh_mvs/meshmvs/output_debug/{}.png".format(
+        #             num_predictions + idx
+        #         ),
+        #         nrow=3
+        #     )
 
         # Store input images and predicted meshes
         if store_predictions:
@@ -459,8 +527,14 @@ def evaluate_split_depth(
 
         num_predictions += len(batch["imgs"])
         logger.info(
-            "Evaluated %d predictions so far: avg err: %f" \
-                    % (num_predictions, total_l1_err / num_pixels)
+                "Evaluated %d predictions so far: avg err: %f, avg depth: %f, min depth: %f, max_depth: %f" \
+                    % (
+                        num_predictions,
+                        total_l1_err / num_pixels,
+                        total_gt_depth / num_pixels,
+                        min_gt_depth,
+                        max_gt_depth
+                    )
         )
         if 0 < max_predictions <= num_predictions:
             break
