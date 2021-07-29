@@ -96,6 +96,13 @@ def main_worker_eval(worker_id, args):
 
     model = build_model(cfg)
     model.load_state_dict(state_dict)
+
+    mvsnet_state_dict = torch.load(cfg.MODEL.MVSNET.CHECKPOINT)
+    mvsnet_state_dict = clean_state_dict(
+        mvsnet_state_dict["best_states"]["model"]
+    )
+    model.mvsnet.load_state_dict(mvsnet_state_dict)
+
     logger.info("Model loaded")
     model.to(device)
 
