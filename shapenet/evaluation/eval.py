@@ -454,61 +454,75 @@ def evaluate_split_depth(
         for k, v in cur_metrics.items():
             metrics[k].append(v)
 
-        # viz_image_size = (224, 224)
-        # viz_masks = interpolate_multi_view_tensor(
-        #     batch["masks"], viz_image_size
-        # ).detach().cpu()
+        viz_image_size = (224, 224)
+        viz_masks = interpolate_multi_view_tensor(
+            batch["masks"], viz_image_size
+        ).detach().cpu()
 
-        # # debug: viz images
-        # def apply_colormap(tensor):
-        #     nonlocal viz_image_size
+        # debug: viz images
+        def apply_colormap(tensor):
+            nonlocal viz_image_size
 
-        #     tensor = F.interpolate(
-        #         tensor.unsqueeze(0).unsqueeze(0),
-        #         viz_image_size, mode="nearest"
-        #     ).squeeze(0).squeeze(0)
+            tensor = F.interpolate(
+                tensor.unsqueeze(0).unsqueeze(0),
+                viz_image_size, mode="nearest"
+            ).squeeze(0).squeeze(0)
 
-        #     nonzeros = (tensor > 1e-7).unsqueeze(0).expand(3, -1, -1) \
-        #                 .detach().cpu().float()
+            nonzeros = (tensor > 1e-7).unsqueeze(0).expand(3, -1, -1) \
+                        .detach().cpu().float()
 
-        #     img = cv2.applyColorMap(
-        #         tensor.detach().cpu().mul(255).byte().numpy(),
-        #         cv2.COLORMAP_JET
-        #     )
-        #     tensor = torch.from_numpy(img).permute(2, 0, 1).float().div(255) \
-        #                 * nonzeros
-        #     tensor = torch.cat((tensor, nonzeros[0].unsqueeze(0)), dim=0)
-        #     return tensor
+            img = cv2.applyColorMap(
+                tensor.detach().cpu().mul(255).byte().numpy(),
+                cv2.COLORMAP_JET
+            )
+            tensor = torch.from_numpy(img).permute(2, 0, 1).float().div(255) \
+                        * nonzeros
+            tensor = torch.cat((tensor, nonzeros[0].unsqueeze(0)), dim=0)
+            return tensor
 
-        # for idx in range(3):
-        #     imgs = F.interpolate(
-        #         batch["imgs"][idx], viz_image_size, mode="bilinear"
-        #     ).detach().cpu()
+        for idx in range(3):
+            imgs = F.interpolate(
+                batch["imgs"][idx], viz_image_size, mode="bilinear"
+            ).detach().cpu()
 
-        #     imgs = [
-        #         torch.cat((deprocess(img), viz_masks[idx, i].unsqueeze(0)))
-        #         for i, img in enumerate(imgs.unbind(0))
-        #     ]
+            imgs = [
+                torch.cat((deprocess(img), viz_masks[idx, i].unsqueeze(0)))
+                for i, img in enumerate(imgs.unbind(0))
+            ]
 
-        #     depth_gt_colored = [apply_colormap(i) for i in depth_gt[idx].unbind(0)]
-        #     depth_pred_colored = [
-        #         apply_colormap(i) for i in masked_pred_depths[idx].unbind(0)
-        #     ]
+            depth_gt_colored = [apply_colormap(i) for i in depth_gt[idx].unbind(0)]
+            depth_pred_colored = [
+                apply_colormap(i) for i in masked_pred_depths[idx].unbind(0)
+            ]
 
-        #     grid = torch.stack((
-        #         imgs[0], depth_gt_colored[0], depth_pred_colored[0],
-        #         imgs[1], depth_gt_colored[1], depth_pred_colored[1],
-        #         imgs[2], depth_gt_colored[2], depth_pred_colored[2],
-        #     ), dim=0)
+            grid = torch.stack((
+                imgs[0], depth_gt_colored[0], depth_pred_colored[0],
+                imgs[1], depth_gt_colored[1], depth_pred_colored[1],
+                imgs[2], depth_gt_colored[2], depth_pred_colored[2],
+            ), dim=0)
 
-
-        #     torchvision.utils.save_image(
-        #         grid,
-        #         "/projects/mesh_mvs/meshmvs/output_debug/{}.png".format(
-        #             num_predictions + idx
-        #         ),
-        #         nrow=3
-        #     )
+            img_idx = num_predictions + idx
+            base_path = "/projects/mesh_mvs/meshmvs/output_debug/depths"
+            img_names = [
+                os.path.join(base_path, "{}_input_view_{}.png".format(img_idx, 0)),
+                os.path.join(base_path, "{}_gt_view_{}.png".format(img_idx, 0)),
+                os.path.join(base_path, "{}_pred_view_{}.png".format(img_idx, 0)),
+                os.path.join(base_path, "{}_input_view_{}.png".format(img_idx, 1)),
+                os.path.join(base_path, "{}_gt_view_{}.png".format(img_idx, 1)),
+                os.path.join(base_path, "{}_pred_view_{}.png".format(img_idx, 1)),
+                os.path.join(base_path, "{}_input_view_{}.png".format(img_idx, 2)),
+                os.path.join(base_path, "{}_gt_view_{}.png".format(img_idx, 2)),
+                os.path.join(base_path, "{}_pred_view_{}.png".format(img_idx, 2)),
+            ]
+            for img, filename in zip(grid.unbind(0), img_names):
+                torchvision.utils.save_image(img, filename)
+            # torchvision.utils.save_image(
+            #     grid,
+            #     "/projects/mesh_mvs/meshmvs/output_debug/{}.png".format(
+            #         num_predictions + idx
+            #     ),
+            #     nrow=3
+            # )
 
         # Store input images and predicted meshes
         if store_predictions:

@@ -13,9 +13,9 @@ from PIL import Image
 import cv2
 import copy
 
-os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
-import pyrender
-import trimesh
+# os.environ['PYOPENGL_PLATFORM'] = 'osmesa'
+# import pyrender
+# import trimesh
 
 import detectron2.utils.comm as comm
 import torch
@@ -32,13 +32,14 @@ from pytorch3d.transforms import Transform3d
 
 from shapenet.config import get_shapenet_cfg
 from shapenet.data import build_data_loader, register_shapenet
+from shapenet.data.utils import image_to_numpy, imagenet_deprocess
 from shapenet.data.mesh_vox import MeshVoxDataset
 from shapenet.evaluation import \
         evaluate_split, evaluate_test, evaluate_test_p2m, evaluate_vox
 
 # required so that .register() calls are executed in module scope
 from shapenet.modeling import MeshLoss, build_model
-from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss
+from shapenet.modeling.heads.depth_loss import adaptive_berhu_loss, interpolate_multi_view_tensor
 from shapenet.modeling.mesh_arch import VoxMeshMultiViewHead, VoxMeshDepthHead
 from shapenet.solver import build_lr_scheduler, build_optimizer
 from shapenet.utils import Checkpoint, Timer, clean_state_dict, default_argument_parser
@@ -82,8 +83,8 @@ def main_worker_eval(worker_id, args):
 
     logger.info("test - %d" % len(test_loader))
 
-    batch = read_batch()
-    # batch = next(iter(test_loader))
+    # batch = read_batch()
+    batch = next(iter(test_loader))
     print('batch keys:', list(batch.keys()))
 
     batch = test_loader.postprocess(batch, device)
@@ -103,17 +104,19 @@ def main_worker_eval(worker_id, args):
     logger.info("Model loaded")
     model.to(device)
 
-    val_loader = build_data_loader(
-        cfg, get_dataset_name(cfg), "test", multigpu=False
-    )
-    logger.info("val - %d" % len(val_loader))
-    test_metrics, test_preds = evaluate_split(
-        model, val_loader, prefix="val_", max_predictions=100
-    )
-    str_out = "Results on test"
-    for k, v in test_metrics.items():
-        str_out += "%s %.4f " % (k, v)
-    logger.info(str_out)
+    # val_loader = build_data_loader(
+    #     cfg, get_dataset_name(cfg), "test", multigpu=False
+    # )
+    # logger.info("val - %d" % len(val_loader))
+    # test_metrics, test_preds = evaluate_split(
+    #     model, val_loader, prefix="val_", max_predictions=100
+    # )
+    # str_out = "Results on test"
+    # for k, v in test_metrics.items():
+    #     str_out += "%s %.4f " % (k, v)
+    # logger.info(str_out)
+
+    # eval_scannet(model, batch)
 
     from shapenet.utils.coords import voxel_coords_to_world, voxel_grid_coords
     from shapenet.modeling.voxel_ops import cubify
@@ -129,45 +132,48 @@ def main_worker_eval(worker_id, args):
     # batch = test_loader.dataset[2748]
     # batch = test_loader.dataset.collate_fn([batch])
 
-    renderer = setup_renderer()
+    # renderer = setup_renderer()
 
-    for batch in tqdm.tqdm(test_loader):
+    data_indices = [
+        test_loader.dataset.model_ids.index(i)
+        for i in [
+            'ead93856b735ec90f0aeabfdcb4e1dd9',
+            'ce7a0aaab23c9317a71c812e027f94d9',
+            'ccd49951295cb4cbe139cf2f6f121cad',
+            'eba66ca2e46521ecb16ea05e48de73ee',
+            'ead6f85d2eaafab32aa8b7caea8a1807',
+            'eada833517294359a3f999fa1343e263',
+        ]
+    ]
+
+    # for batch in tqdm.tqdm(test_loader):
     # if True:
+    for data_idx in data_indices:
+        batch = test_loader.dataset[data_idx]
+        batch = test_loader.dataset.collate_fn([batch])
+
         sid, mid = batch["id_strs"][0].split('-')[0:2]
         # if sid != "03001627" or mid != "cc8fe2000b1471b2a85f7c85e000fc79":
         #     continue
 
-        if '_'.join([sid, mid]) not in [
-            "03001627_df55d3e445f11f909a8ef44e1d2c5b75",
-            "03001627_faef9e4cff5fa61987be36ce60737655",
-            "03001627_eb7c250519101dc22f21cf17406f1f25",
-            "02691156_da58b3e055132c9f6afab9f956f15ea",
-            "02691156_df6aae66a8c378ae9029a69fa5fc9ad",
-            "02691156_e31da3ac74fa3c0c23db3adbb2f1dce",
-            "02691156_e02485f093835f45c1b64d86df61366a",
-            "02691156_ebe0d0bfa6ec36edd88eab18f1be033b",
-            "02691156_fbf6917bdd86d5862df404314e891e08",
-            "02691156_f7160900b6ce7bc4e63e266a803d9270",
-            "04379243_fc7d921df59e86e6beedb4c8fd29e2d1",
-            "04379243_fb50672ad3f7b196cae684aee7caa8d9",
-            "04379243_e750a8adb862c9f654f948e69de0f232",
-            "04379243_ddeb44a5621da142aa29e9f0529e8ef7",
-            "04379243_dd4f28a0e0d3f93c614a26402360d21a",
-            "04379243_d0b38b27495542461b02cde7e81f0fc3",
-            "02828884_e2be5da815f914f22250bf58700b4d8f",
-        ]:
-            continue
+        # if '_'.join([sid, mid]) not in [
+        #     '04379243_ead93856b735ec90f0aeabfdcb4e1dd9',
+        #     '04379243_ce7a0aaab23c9317a71c812e027f94d9',
+        #     '03001627_ccd49951295cb4cbe139cf2f6f121cad',
+        #     '04379243_eba66ca2e46521ecb16ea05e48de73ee'
+        # ]:
+        #     continue
 
         # if Path('/tmp/grid_{}_{}.png'.format(sid, mid)).exists():
         #     print(sid, '_', mid, 'already done')
         #     continue
 
-        img1 = get_image(test_loader.dataset.data_dir, sid, mid, '00.png')
-        img2 = get_image(test_loader.dataset.data_dir, sid, mid, '06.png')
-        img3 = get_image(test_loader.dataset.data_dir, sid, mid, '07.png')
+        # img1 = get_image(test_loader.dataset.data_dir, sid, mid, '00.png')
+        # img2 = get_image(test_loader.dataset.data_dir, sid, mid, '06.png')
+        # img3 = get_image(test_loader.dataset.data_dir, sid, mid, '07.png')
 
-        if None in [img1, img2, img3]:
-            continue
+        # if None in [img1, img2, img3]:
+        #     continue
 
         batch = test_loader.postprocess(batch, device)
         model_kwargs = {
@@ -175,6 +181,11 @@ def main_worker_eval(worker_id, args):
             for key in ['intrinsics', 'extrinsics', 'masks', 'depths']
         }
         model_outputs = model(batch["imgs"].to(device), **model_kwargs)
+
+        ## save depths
+        save_depths(batch, model_outputs)
+
+        continue
 
         extrinsics = batch["extrinsics"]
         rel_extrinsics  = relative_extrinsics(extrinsics, extrinsics[:, 0])
@@ -266,12 +277,85 @@ def main_worker_eval(worker_id, args):
         # )
 
 
-    renderer["renderer"].delete()
+    # renderer["renderer"].delete()
 
-    exit(0)
+    # exit(0)
 
 
-    eval_scannet(model, batch)
+def save_depths(batch, model_outputs):
+    viz_image_size = (224, 224)
+
+    viz_masks = interpolate_multi_view_tensor(
+        batch["masks"], viz_image_size
+    ).detach().cpu()
+
+    pred_depths = interpolate_multi_view_tensor(
+        model_outputs["pred_depths"], viz_image_size
+    ).detach().cpu()
+
+    masked_depths = (pred_depths * viz_masks)
+
+    deprocess = imagenet_deprocess(rescale_image=False)
+
+    def apply_colormap(tensor):
+        nonlocal viz_image_size
+
+        tensor = F.interpolate(
+            tensor.unsqueeze(0).unsqueeze(0),
+            viz_image_size, mode="nearest"
+        ).squeeze(0).squeeze(0)
+
+        nonzeros = (tensor > 0.3).unsqueeze(0).expand(3, -1, -1) \
+                    .detach().cpu().float()
+
+        tensor = torch.clamp(tensor, max=2.2) / 2.2
+
+        img = cv2.applyColorMap(
+            tensor.detach().cpu().mul(255).byte().numpy(),
+            cv2.COLORMAP_JET
+        )
+        tensor = torch.from_numpy(img).permute(2, 0, 1).float().div(255) \
+                    * nonzeros
+        tensor = torch.cat((tensor, nonzeros[0].unsqueeze(0)), dim=0)
+        return tensor
+
+    idx = 0
+
+    imgs = F.interpolate(
+        batch["imgs"][idx], viz_image_size, mode="bilinear"
+    ).detach().cpu()
+
+    imgs = [
+        torch.cat((deprocess(img), viz_masks[idx, i].unsqueeze(0)))
+        for i, img in enumerate(imgs.unbind(0))
+    ]
+
+    depth_gt_colored = [apply_colormap(i) for i in batch["depths"][idx].unbind(0)]
+    depth_pred_colored = [
+        apply_colormap(i) for i in masked_depths[idx].unbind(0)
+    ]
+
+    grid = torch.stack((
+        imgs[0], depth_gt_colored[0], depth_pred_colored[0],
+        imgs[1], depth_gt_colored[1], depth_pred_colored[1],
+        imgs[2], depth_gt_colored[2], depth_pred_colored[2],
+    ), dim=0)
+
+    img_idx = batch["id_strs"][idx]
+    base_path = "/projects/mesh_mvs/meshmvs/output_debug/new_depths_plus_mesh"
+    img_names = [
+        os.path.join(base_path, "{}_input_view_{}.png".format(img_idx, 0)),
+        os.path.join(base_path, "{}_gt_view_{}.png".format(img_idx, 0)),
+        os.path.join(base_path, "{}_pred_view_{}.png".format(img_idx, 0)),
+        os.path.join(base_path, "{}_input_view_{}.png".format(img_idx, 1)),
+        os.path.join(base_path, "{}_gt_view_{}.png".format(img_idx, 1)),
+        os.path.join(base_path, "{}_pred_view_{}.png".format(img_idx, 1)),
+        os.path.join(base_path, "{}_input_view_{}.png".format(img_idx, 2)),
+        os.path.join(base_path, "{}_gt_view_{}.png".format(img_idx, 2)),
+        os.path.join(base_path, "{}_pred_view_{}.png".format(img_idx, 2)),
+    ]
+    for img, filename in zip(grid.unbind(0), img_names):
+        torchvision.utils.save_image(img, filename)
 
 
 def get_image(data_dir, sid, mid, img):
@@ -381,7 +465,7 @@ def eval_scannet(model, batch):
         for key in ['intrinsics', 'extrinsics', 'masks', 'depths']
     }
 
-    model.mvsnet = None
+    # model.mvsnet = None
 
     # print('imgs', batch['imgs'].shape)
     # print('input', model.mvsnet.input_image_size)
@@ -414,7 +498,7 @@ def pose_to_opengl(cam_pose):
 
 
 def read_batch():
-    data_root = Path('/datasets/scannet/scans')
+    data_root = Path('/projects/mesh_mvs/iccv2021_rebuttal/real-world/scannet/scans')
     scene = Path('scene0001_00')
     img_path = data_root / scene / 'segmented-color'
     depth_path = data_root / scene / 'segmented-depth'

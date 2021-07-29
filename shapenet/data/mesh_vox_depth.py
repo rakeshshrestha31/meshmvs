@@ -81,7 +81,8 @@ class MeshVoxDepthDataset(MeshVoxMultiViewDataset):
         for iid in self.image_ids:
             img_path = metadata["image_list"][iid]
             depths.append(self.read_depth(self.data_dir, sid, mid, iid))
-            masks.append(self.read_mask(self.data_dir, sid, mid, img_path))
+            masks.append((depths[-1] > 1e-7).float())
+            # masks.append(self.read_mask(self.data_dir, sid, mid, img_path))
 
         depths = torch.stack(depths, dim=0)
         masks = torch.stack(masks, dim=0)

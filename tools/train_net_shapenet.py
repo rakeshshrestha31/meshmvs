@@ -8,6 +8,7 @@ import shutil
 import time
 import numpy as np
 import tqdm
+import copy
 
 import detectron2.utils.comm as comm
 import torch
@@ -647,19 +648,19 @@ def save_debug_predictions(batch, model_outputs):
                 ), point_cloud)
 
                 # gt points
-                local_gt_points = transform.transform_points(global_gt_points)
-                point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
-                    local_gt_points.cpu().numpy()
-                ))
-                # gt weights for ground truth corresponding to view idx
-                gt_view_weights = np.zeros(
-                    (local_gt_points.shape[0], num_views), dtype=np.float64
-                )
-                gt_view_weights[:, view_idx] = 1.0
-                point_cloud.colors = o3d.utility.Vector3dVector(gt_view_weights)
-                o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}_gt_cloud.ply".format(
-                    label, label_appendix, stage_idx, view_idx
-                ), point_cloud)
+                # local_gt_points = transform.transform_points(global_gt_points)
+                # point_cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(
+                #     local_gt_points.cpu().numpy()
+                # ))
+                # # gt weights for ground truth corresponding to view idx
+                # gt_view_weights = np.zeros(
+                #     (local_gt_points.shape[0], num_views), dtype=np.float64
+                # )
+                # gt_view_weights[:, view_idx] = 1.0
+                # point_cloud.colors = o3d.utility.Vector3dVector(gt_view_weights)
+                # o3d.io.write_point_cloud("/tmp/{}_{}_{}_{}_gt_cloud.ply".format(
+                #     label, label_appendix, stage_idx, view_idx
+                # ), point_cloud)
 
     if "pred_depths" in model_outputs:
         masks = F.interpolate(
